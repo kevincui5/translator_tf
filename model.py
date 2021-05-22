@@ -4,19 +4,19 @@ import tensorflow as tf
 
 from sklearn.model_selection import train_test_split
 
-import numpy as np
+#import numpy as np
 import os
 import time
 from util import *
 
-path_to_file = os.path.dirname("spa-6624.txt")
+path_to_file = "spa-6624.txt"
 
 en_sentence = u"May I borrow this book?"
 sp_sentence = u"¿Puedo tomar prestado este libro?"
 print(preprocess_sentence(en_sentence))
 print(preprocess_sentence(sp_sentence).encode('utf-8'))
 
-en, sp = create_dataset(path_to_file, None)
+en, sp = create_dataset("deu-3253.txt", None)
 print(en[-1])
 print(sp[-1])
 
@@ -44,7 +44,7 @@ BUFFER_SIZE = len(input_tensor_train)
 BATCH_SIZE = 64
 steps_per_epoch = len(input_tensor_train)//BATCH_SIZE
 embedding_dim = 256
-units = 1024
+hidden_units = 1024
 vocab_inp_size = len(inp_tokenizer.word_index)+1
 vocab_tar_size = len(targ_tokenizer.word_index)+1
 
@@ -54,21 +54,21 @@ dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
 example_input_batch, example_target_batch = next(iter(dataset))
 example_input_batch.shape, example_target_batch.shape
 
-encoder = Encoder(vocab_inp_size, embedding_dim, units, BATCH_SIZE)
+encoder = Encoder(vocab_inp_size, embedding_dim, hidden_units, BATCH_SIZE)
 
 # sample input
 sample_hidden = encoder.initialize_hidden_state()
 sample_output, sample_hidden = encoder(example_input_batch, sample_hidden)
-print('Encoder output shape: (batch size, sequence length, units)', sample_output.shape)
-print('Encoder Hidden state shape: (batch size, units)', sample_hidden.shape)
+print('Encoder output shape: (batch size, sequence length, hidden_units)', sample_output.shape)
+print('Encoder Hidden state shape: (batch size, hidden_units)', sample_hidden.shape)
 
 attention_layer = BahdanauAttention(10)
 attention_result, attention_weights = attention_layer(sample_hidden, sample_output)
 
-print("Attention result shape: (batch size, units)", attention_result.shape)
+print("Attention result shape: (batch size, hidden_units)", attention_result.shape)
 print("Attention weights shape: (batch_size, sequence_length, 1)", attention_weights.shape)
 
-decoder = Decoder(vocab_tar_size, embedding_dim, units, BATCH_SIZE)
+decoder = Decoder(vocab_tar_size, embedding_dim, hidden_units, BATCH_SIZE)
 
 sample_decoder_output, _, _ = decoder(tf.random.uniform((BATCH_SIZE, 1)),
                                       sample_hidden, sample_output)
@@ -83,7 +83,7 @@ checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
                                  decoder=decoder)
-EPOCHS = 10
+EPOCHS = 1
 
 for epoch in range(EPOCHS):
   start = time.time()
