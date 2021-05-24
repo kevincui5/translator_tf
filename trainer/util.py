@@ -87,7 +87,13 @@ def convert(lang, tensor):
   for t in tensor:
     if t != 0:
       print(f'{t} ----> {lang.index_word[t]}')
-      
+def convert_to_sentence(tokenizer, tensor):
+  sentence = ''
+  for t in tensor:
+    if t != 0:
+      sentence += tokenizer.index_word[t] + ' '  
+  return sentence
+
 class Encoder(tf.keras.Model):
   def __init__(self, vocab_size, embedding_dim, enc_units, batch_sz):
     super(Encoder, self).__init__()

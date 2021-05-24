@@ -14,7 +14,7 @@ from trainer.util import *
 
 def train(args):
     #params = create_Dataset(args['complete_data_path'])
-    examples_limit = 400000
+    examples_limit = 40000
     input_ndarray, target_ndarray, inp_tokenizer, targ_tokenizer = load_dataset(args['complete_data_path'], examples_limit)
     BATCH_SIZE = 256
     #steps_per_epoch = 6624
