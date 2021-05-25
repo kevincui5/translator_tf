@@ -23,7 +23,7 @@ if __name__ == "__main__":
         required=True
     )
     parser.add_argument(
-        "--complete_data_path",
+        "--full_data_path",
         help="GCS location of raw data",
         required=True
     )

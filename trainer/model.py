@@ -1,28 +1,23 @@
 # -*- coding: utf-8 -*-
 
 import tensorflow as tf
-
-from sklearn.model_selection import train_test_split
-
 #import numpy as np
 import os
 import time
 from trainer.util import *
 
-#example_input_batch, example_target_batch = next(iter(dataset))
-#example_input_batch.shape, example_target_batch.shape
-
 def train(args):
-    #params = create_Dataset(args['complete_data_path'])
-    examples_limit = 40000
-    input_ndarray, target_ndarray, inp_tokenizer, targ_tokenizer = load_dataset(args['complete_data_path'], examples_limit)
-    BATCH_SIZE = 256
-    #steps_per_epoch = 6624
-    embedding_dim = 256
-    hidden_units_num = 1024
-    vocab_inp_size = len(inp_tokenizer.word_index)+1
-    vocab_tar_size = len(targ_tokenizer.word_index)+1
-    input_ndarray_train, input_ndarray_val, target_ndarray_train, target_ndarray_val = train_test_split(input_ndarray, target_ndarray, test_size=0.2)       
+    params = get_dataset_params(args['full_data_path'])
+    BATCH_SIZE = args['batch_size']
+    embedding_dim = args['embedding_dim']
+    hidden_units_num = args['hidden_units']
+    inp_tokenizer = params['inp_tokenizer']
+    targ_tokenizer = params['targ_tokenizer']
+    vocab_inp_size = params['vocab_inp_size']
+    vocab_tar_size = params['vocab_tar_size']
+    input_ndarray_train, target_ndarray_train = load_dataset(inp_tokenizer, 
+                                                             targ_tokenizer, 
+                                                             args['train_data_path'])      
     steps_per_epoch = len(input_ndarray_train)//BATCH_SIZE
  
     BUFFER_SIZE = len(input_ndarray_train)
@@ -30,15 +25,14 @@ def train(args):
     attention_layer = BahdanauAttention(10)
     #attention_result, attention_weights = attention_layer(sample_hidden, sample_output)
     decoder = Decoder(vocab_tar_size, embedding_dim, hidden_units_num, BATCH_SIZE)
-    #sample_decoder_output, _, _ = decoder(tf.random.uniform((BATCH_SIZE, 1)), sample_hidden, sample_output)
     
     optimizer = tf.keras.optimizers.Adam()        
-    checkpoint_dir = './training_checkpoints'
+    checkpoint_dir = args['output_dir']
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
     checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                      encoder=encoder,
                                      decoder=decoder)
-    EPOCHS = 2
+    EPOCHS = args['num_epochs']
     dataset = tf.data.Dataset.from_tensor_slices((input_ndarray_train, target_ndarray_train)).shuffle(BUFFER_SIZE)
     dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
     for epoch in range(EPOCHS):
@@ -60,14 +54,3 @@ def train(args):
     
       print(f'Epoch {epoch+1} Loss {total_loss/steps_per_epoch:.4f}')
       print(f'Time taken for 1 epoch {time.time()-start:.2f} sec\n')
-#train('')
-'''  
-# restoring the latest checkpoint in checkpoint_dir
-checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
-
-translate(u'hace mucho frio aqui.')
-translate(u'esta es mi vida.')
-translate(u'¿todavia estan en casa?')
-# wrong translation
-translate(u'trata de averiguarlo.')
-'''

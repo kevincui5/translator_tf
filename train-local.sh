@@ -6,9 +6,11 @@ gcloud ai-platform local train \
         --module-name=trainer.task \
         --package-path="./trainer" \
         -- \
-        --batch_size=128 \
-        --embedding_dim=100 \
-        --num_epochs=1 \
+        --batch_size=256 \
+        --embedding_dim=256 \
+        --hidden_units=1024 \
+        --num_epochs=2 \
         --job-dir="./job" \
         --output_dir="./trained_model" \
-        --complete_data_path="./spa-6624.txt"
+        --full_data_path="./full-data-3253.csv" \
+        --train_data_path="./train-3253.csv"

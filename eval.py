@@ -2,15 +2,17 @@
 import numpy as np
 import tensorflow as tf
 from trainer.util import *
-from sklearn.model_selection import train_test_split
 from nltk.translate.bleu_score import corpus_bleu
 
 hidden_units_num = 1024
 BATCH_SIZE = 256
 embedding_dim = 256
 
+test_data_path = 'test-3253.csv'
+full_data_path = 'full-data-3253.csv'
 #each input is a single example
-def translate(input_indexed, inp_tokenizer, targ_tokenizer, max_length_inp, max_length_targ, encoder, decoder):
+def translate(input_indexed, inp_tokenizer, targ_tokenizer, max_length_inp, 
+              max_length_targ, encoder, decoder):
 
   attention_plot = np.zeros((max_length_targ, max_length_inp))
   input_tensor = tf.convert_to_tensor(input_indexed)
@@ -43,16 +45,16 @@ def translate(input_indexed, inp_tokenizer, targ_tokenizer, max_length_inp, max_
   return predicted_sentence, attention_plot
 
   
-def evaluate(data_full):
-  examples_limit = 100000 #need to match that of training or the tokenizers will be diff
-  test_limit = 100
-  inputs_indexed, targets_indexed, inp_tokenizer, targ_tokenizer = load_dataset(data_full, examples_limit)
+def evaluate():
+  params = get_dataset_params(full_data_path)  
+  inp_tokenizer = params['inp_tokenizer']
+  targ_tokenizer = params['targ_tokenizer']
+  inputs_indexed, targets_indexed = load_dataset(inp_tokenizer, 
+                                                 targ_tokenizer, test_data_path)
   max_length_targ = inputs_indexed.shape[1]
   max_length_inp = targets_indexed.shape[1]  
-  vocab_inp_size = len(inp_tokenizer.word_index)+1
-  vocab_tar_size = len(targ_tokenizer.word_index)+1  
-  encoder = Encoder(vocab_inp_size, embedding_dim, hidden_units_num, BATCH_SIZE)
-  decoder = Decoder(vocab_tar_size, embedding_dim, hidden_units_num, BATCH_SIZE)  
+  encoder = Encoder(params['vocab_inp_size'], embedding_dim, hidden_units_num, BATCH_SIZE)
+  decoder = Decoder(params['vocab_tar_size'] , embedding_dim, hidden_units_num, BATCH_SIZE)  
   optimizer = tf.keras.optimizers.Adam()
   checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
@@ -66,31 +68,19 @@ def evaluate(data_full):
     targ_sentences.append([targ_sentence.split()[1:-1]])
     predicted_sentence, attention_plot = translate([in_targ_indexed[0]], inp_tokenizer, targ_tokenizer, max_length_inp, max_length_targ, encoder, decoder)
     predicted_sentences.append(predicted_sentence.split()[1:-1])
-    if i > test_limit:
-      break;
-    if i > 10: #show a preview
+    if i > 5: #show a preview
       continue;
-    #print(in_targ_indexed[0])  
     print('src=[%s], target=[%s], predicted=[%s]' % (inp_sentence, 
           targ_sentence, predicted_sentence))
-
+    attention_plot = attention_plot[:len(predicted_sentence.split(' ')),
+                                  :len(targ_sentence.split(' '))]
+    plot_attention(attention_plot, targ_sentence.split(' '), predicted_sentence.split(' ')) 
   print('BLEU-1: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(1.0, 0, 0, 0)))
   print('BLEU-2: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.5, 0.5, 0, 0)))
   print('BLEU-3: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.3, 0.3, 0.3, 0)))
   print('BLEU-4: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.25, 0.25, 0.25, 0.25)))
-    #print(predicted_sentence) 
-    #print(input_processed_sentence)
-  #input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val = train_test_split(params['input_tensor'], params['target_tensor'], test_size=0.2)    
 
   #translate(sentence, params)
   #result, sentence, attention_plot = translate(sentence, params)
-
-  #print('Input:', input_tensor_train)
-  #print('Predicted translation:', result)
-
-  #attention_plot = attention_plot[:len(result.split(' ')),
-   #                               :len(sentence.split(' '))]
-  #plot_attention(attention_plot, sentence.split(' '), result.split(' ')) 
-
-evaluate('deu.txt')
+evaluate()
  

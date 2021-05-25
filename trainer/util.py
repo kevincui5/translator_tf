@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
-
 import tensorflow as tf
 import unicodedata
 import re
 import io
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-#import numpy as np
 
 # Converts the unicode file to ascii
 def unicode_to_ascii(s):
   return ''.join(c for c in unicodedata.normalize('NFD', s)
                  if unicodedata.category(c) != 'Mn')
-
 
 def preprocess_sentence(w):
   w = unicode_to_ascii(w.lower().strip())
@@ -36,12 +33,10 @@ def preprocess_sentence(w):
 # 1. Remove the accents
 # 2. Clean the sentences
 # 3. Return word pairs in the format: [ENGLISH, SPANISH]
-def split_input_output(path, num_examples):
+def split_input_output(path):
   lines = io.open(path, encoding='UTF-8').read().strip().split('\n')
-
-  inputs_outputs = [[preprocess_sentence(sentence) for sentence in line.split('\t')]
-                for line in lines[:num_examples]]
-
+  inputs_outputs = [[preprocess_sentence(sentence) for sentence in line.split(',')]
+                for line in lines]
   return zip(*inputs_outputs)
 
 def tokenize(text):
@@ -52,31 +47,37 @@ def tokenize(text):
   tokenized_text = lang_tokenizer.texts_to_sequences(text)
   tokenized_text = tf.keras.preprocessing.sequence.pad_sequences(tokenized_text,
                                                          padding='post')
-
   return tokenized_text, lang_tokenizer
 
-def load_dataset(path, num_examples=None):
+def load_full_dataset(path):
   # creating cleaned input, output pairs
-  targ_lang, inp_lang = split_input_output(path, num_examples)
+  targ_lang, inp_lang = split_input_output(path)
 
   input_ndarray, inp_lang_tokenizer = tokenize(inp_lang)
   target_ndarray, targ_tokenizer = tokenize(targ_lang)
 
   return input_ndarray, target_ndarray, inp_lang_tokenizer, targ_tokenizer
 
-def create_Dataset(input_file, num_examples):
-    path_to_file = "spa-6624.txt"
-    # Try experimenting with the size of that dataset
-    #num_examples = 30
-    params = {}
-    input_ndarray, target_ndarray, inp_tokenizer, targ_tokenizer = load_dataset(path_to_file,
-                                                                    num_examples)   
-    # Calculate max_length of the target tensors
-    max_length_targ, max_length_inp = target_ndarray.shape[1], input_ndarray.shape[1]    
-    # Creating training and validation sets using an 80-20 split
+def load_dataset(inp_tokenizer, targ_tokenizer, path):
+  # creating cleaned input, output pairs
+  targ_lang, inp_lang = split_input_output(path)
+  inp_tokenized_text = inp_tokenizer.texts_to_sequences(inp_lang)
+  inp_tokenized_text = tf.keras.preprocessing.sequence.pad_sequences(inp_tokenized_text,
+                                                         padding='post')
+  targ_tokenized_text = targ_tokenizer.texts_to_sequences(targ_lang)
+  targ_tokenized_text = tf.keras.preprocessing.sequence.pad_sequences(targ_tokenized_text,
+                                                         padding='post')
+  return inp_tokenized_text, targ_tokenized_text
 
-    params['input_ndarray'] = input_ndarray
-    params['target_ndarray'] = target_ndarray
+def get_dataset_params(data_full_file):
+    params = {}
+    input_ndarray, target_ndarray, inp_tokenizer, targ_tokenizer = load_full_dataset(data_full_file)   
+    # Calculate max_length of the target tensors
+    max_length_targ, max_length_inp = target_ndarray.shape[1], input_ndarray.shape[1]  
+    vocab_inp_size = len(inp_tokenizer.word_index)+1
+    vocab_tar_size = len(targ_tokenizer.word_index)+1
+    params['vocab_inp_size'] = vocab_inp_size
+    params['vocab_tar_size'] = vocab_tar_size
     params['inp_tokenizer'] = inp_tokenizer
     params['targ_tokenizer'] = targ_tokenizer
     params['max_length_targ'] = max_length_targ
@@ -87,6 +88,7 @@ def convert(lang, tensor):
   for t in tensor:
     if t != 0:
       print(f'{t} ----> {lang.index_word[t]}')
+      
 def convert_to_sentence(tokenizer, tensor):
   sentence = ''
   for t in tensor:
