@@ -11,6 +11,6 @@ gcloud ai-platform local train \
         --hidden_units=1024 \
         --num_epochs=2 \
         --job-dir="./job" \
-        --output_dir="./trained_model" \
+        --output_dir="./training_checkpoints" \
         --full_data_path="./full-data-1700.csv" \
         --train_data_path="./train-1700.csv"

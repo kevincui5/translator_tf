@@ -8,8 +8,10 @@ hidden_units_num = 1024
 BATCH_SIZE = 256
 embedding_dim = 256
 
-test_data_path = 'test-3253.csv'
-full_data_path = 'full-data-3253.csv'
+full_data_path = 'full-data-1700.csv'
+train_data_path = 'train-1700.csv'
+test_data_path = 'test-1700.csv'
+saved_model_path = 'training_checkpoints'
 #each input is a single example
 def translate(input_indexed, inp_tokenizer, targ_tokenizer, max_length_inp, 
               max_length_targ, encoder, decoder):
@@ -44,29 +46,15 @@ def translate(input_indexed, inp_tokenizer, targ_tokenizer, max_length_inp,
 
   return predicted_sentence, attention_plot
 
-  
-def evaluate():
-  params = get_dataset_params(full_data_path)  
-  inp_tokenizer = params['inp_tokenizer']
-  targ_tokenizer = params['targ_tokenizer']
-  inputs_indexed, targets_indexed = load_dataset(inp_tokenizer, 
-                                                 targ_tokenizer, test_data_path)
-  max_length_targ = inputs_indexed.shape[1]
-  max_length_inp = targets_indexed.shape[1]  
-  encoder = Encoder(params['vocab_inp_size'], embedding_dim, hidden_units_num, BATCH_SIZE)
-  decoder = Decoder(params['vocab_tar_size'] , embedding_dim, hidden_units_num, BATCH_SIZE)  
-  optimizer = tf.keras.optimizers.Adam()
-  checkpoint = tf.train.Checkpoint(optimizer=optimizer,
-                                 encoder=encoder,
-                                 decoder=decoder)  
-  # restoring the latest checkpoint in checkpoint_dir
-  checkpoint.restore(tf.train.latest_checkpoint("training_checkpoints"))  
+def predict(inputs_indexed, targets_indexed, params, encoder, decoder):
   targ_sentences, predicted_sentences = list(), list()
   for i, in_targ_indexed in enumerate(zip(inputs_indexed, targets_indexed)): #because we use special token to mark end of sentence, each indexed sentence has diff len, so can't predict as vector
-    targ_sentence = convert_to_sentence(targ_tokenizer, in_targ_indexed[1])
-    inp_sentence = (convert_to_sentence(inp_tokenizer, in_targ_indexed[0]))
+    targ_sentence = convert_to_sentence(params['targ_tokenizer'], in_targ_indexed[1])
+    inp_sentence = (convert_to_sentence(params['inp_tokenizer'], in_targ_indexed[0]))
     targ_sentences.append([targ_sentence.split()[1:-1]])
-    predicted_sentence, attention_plot = translate([in_targ_indexed[0]], inp_tokenizer, targ_tokenizer, max_length_inp, max_length_targ, encoder, decoder)
+    predicted_sentence, attention_plot = translate([in_targ_indexed[0]], 
+                                                   params['inp_tokenizer'], params['targ_tokenizer'], 
+                                                   params['max_length_inp'], params['max_length_targ'], encoder, decoder)
     predicted_sentences.append(predicted_sentence.split()[1:-1])
     if i > 5: #show a preview
       continue;
@@ -80,6 +68,27 @@ def evaluate():
   print('BLEU-3: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.3, 0.3, 0.3, 0)))
   print('BLEU-4: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.25, 0.25, 0.25, 0.25)))
 
+  
+def evaluate():
+  params = get_dataset_params(full_data_path)  
+  inp_tokenizer = params['inp_tokenizer']
+  targ_tokenizer = params['targ_tokenizer']
+  train_inputs_indexed, train_targets_indexed = load_dataset(inp_tokenizer, 
+                                                 targ_tokenizer, train_data_path)
+  #max_length_targ = train_inputs_indexed.shape[1]
+  #max_length_inp = train_targets_indexed.shape[1]  
+  encoder = Encoder(params['vocab_inp_size'], embedding_dim, hidden_units_num, BATCH_SIZE)
+  decoder = Decoder(params['vocab_tar_size'] , embedding_dim, hidden_units_num, BATCH_SIZE)  
+  optimizer = tf.keras.optimizers.Adam()
+  checkpoint = tf.train.Checkpoint(optimizer=optimizer,
+                                 encoder=encoder,
+                                 decoder=decoder)  
+  # restoring the latest checkpoint in checkpoint_dir
+  checkpoint.restore(tf.train.latest_checkpoint(saved_model_path))  
+  predict(train_inputs_indexed, train_targets_indexed, params, encoder, decoder)
+  test_inputs_indexed, test_targets_indexed = load_dataset(inp_tokenizer, 
+                                                 targ_tokenizer, test_data_path)  
+  predict(train_inputs_indexed, train_targets_indexed, params, encoder, decoder)
   #translate(sentence, params)
   #result, sentence, attention_plot = translate(sentence, params)
 evaluate()
