@@ -10,6 +10,12 @@ from numpy.random import rand
 from numpy.random import shuffle
 from trainer.util import *
 
+RAW_FILE = 'deu.txt'
+example_limit = 95000
+FULL_DATA_FILE = 'english-german-{}.csv'.format(example_limit)
+TRAIN_FILE = 'english-german-train-{}.csv'.format(example_limit)
+TEST_FILE = 'english-german-test-{}.csv'.format(example_limit)
+
 # load doc into memory
 def load_doc(filename):
 	# open the file as read only
@@ -33,12 +39,13 @@ def save_clean_data(sentences, filename):
     print('Saved: %s' % filename)
     
 # load dataset
-filename = 'deu-3253.txt'
+filename = RAW_FILE
 doc = load_doc(filename)
 # split into english-german pairs
 pairs = to_pairs(doc)
+pairs = pairs[:example_limit]
 # save clean pairs to file
-save_clean_data(pairs, 'full-data-1700.csv')
+save_clean_data(pairs, FULL_DATA_FILE)
 # spot check
 for i in range(10):
 	print('[%s] => [%s]' % (pairs[i][0], pairs[i][1]))
@@ -59,5 +66,5 @@ train_size = int(ratio*n_sentences)
 train, test = dataset[:train_size], dataset[train_size:]
 # save
 #save_clean_data(dataset, 'english-german-both.pkl')
-save_clean_data(train, 'train-1700.csv')
-save_clean_data(test, 'test-1700.csv')
+save_clean_data(train, TRAIN_FILE)
+save_clean_data(test, TEST_FILE)

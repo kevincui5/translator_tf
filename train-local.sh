@@ -1,6 +1,8 @@
 #!/bin/bash
 set -ev
 
+export example_limit=1700
+
 echo "Training local ML model"
 gcloud ai-platform local train \
         --module-name=trainer.task \
@@ -12,5 +14,5 @@ gcloud ai-platform local train \
         --num_epochs=2 \
         --job-dir="./job" \
         --output_dir="./training_checkpoints" \
-        --full_data_path="./full-data-1700.csv" \
-        --train_data_path="./train-1700.csv"
+        --full_data_path="./full-data-"$example_limit".csv" \
+        --train_data_path="./train-"$example_limit".csv"
