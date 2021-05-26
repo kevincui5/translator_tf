@@ -12,6 +12,7 @@ full_data_path = 'full-data-1700.csv'
 train_data_path = 'train-1700.csv'
 test_data_path = 'test-1700.csv'
 saved_model_path = 'training_checkpoints'
+
 #each input is a single example
 def translate(input_indexed, inp_tokenizer, targ_tokenizer, max_length_inp, 
               max_length_targ, encoder, decoder):
@@ -75,8 +76,6 @@ def evaluate():
   targ_tokenizer = params['targ_tokenizer']
   train_inputs_indexed, train_targets_indexed = load_dataset(inp_tokenizer, 
                                                  targ_tokenizer, train_data_path)
-  #max_length_targ = train_inputs_indexed.shape[1]
-  #max_length_inp = train_targets_indexed.shape[1]  
   encoder = Encoder(params['vocab_inp_size'], embedding_dim, hidden_units_num, BATCH_SIZE)
   decoder = Decoder(params['vocab_tar_size'] , embedding_dim, hidden_units_num, BATCH_SIZE)  
   optimizer = tf.keras.optimizers.Adam()
@@ -89,7 +88,5 @@ def evaluate():
   test_inputs_indexed, test_targets_indexed = load_dataset(inp_tokenizer, 
                                                  targ_tokenizer, test_data_path)  
   predict(train_inputs_indexed, train_targets_indexed, params, encoder, decoder)
-  #translate(sentence, params)
-  #result, sentence, attention_plot = translate(sentence, params)
 evaluate()
  
