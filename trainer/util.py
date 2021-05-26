@@ -2,7 +2,7 @@
 import tensorflow as tf
 import unicodedata
 import re
-import io
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
@@ -34,10 +34,10 @@ def preprocess_sentence(w):
 # 2. Clean the sentences
 # 3. Return word pairs in the format: [ENGLISH, SPANISH]
 def split_input_output(path):
-  lines = io.open(path, encoding='UTF-8').read().strip().split('\n')
-  inputs_outputs = [[preprocess_sentence(sentence) for sentence in line.split(',')]
-                for line in lines]
-  return zip(*inputs_outputs)
+  #lines = io.open(path, encoding='UTF-8').read().strip().split('\n')
+  lines = pd.read_csv(path, sep='\t', encoding='utf_8')
+  sentences_pair = lines.applymap(preprocess_sentence)
+  return sentences_pair.iloc[:,0].tolist(), sentences_pair.iloc[:,1].tolist()
 
 def tokenize(text):
   lang_tokenizer = tf.keras.preprocessing.text.Tokenizer(filters='')

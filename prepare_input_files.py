@@ -29,7 +29,7 @@ def to_pairs(doc):
 
 def save_clean_data(sentences, filename):
 	#dump(sentences, open(filename, 'wb'))
-    np.savetxt(filename, sentences, delimiter=",", fmt='%s')
+    np.savetxt(filename, sentences, delimiter="\t", fmt='%s', encoding='utf-8')
     print('Saved: %s' % filename)
     
 # load dataset

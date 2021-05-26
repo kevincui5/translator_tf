@@ -12,5 +12,5 @@ gcloud ai-platform local train \
         --num_epochs=2 \
         --job-dir="./job" \
         --output_dir="./trained_model" \
-        --full_data_path="./full-data-3253.csv" \
-        --train_data_path="./train-3253.csv"
+        --full_data_path="./full-data-1700.csv" \
+        --train_data_path="./train-1700.csv"
