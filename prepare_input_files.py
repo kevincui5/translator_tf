@@ -8,14 +8,14 @@ from numpy import array
 import numpy as np
 from numpy.random import rand
 from numpy.random import shuffle
-from trainer.util import *
+#from trainer.util import *
 
 RAW_FILE = 'deu.txt'
-example_limit = 95000
+example_limit = 1700
 FULL_DATA_FILE = 'english-german-{}.csv'.format(example_limit)
 TRAIN_FILE = 'english-german-train-{}.csv'.format(example_limit)
 TEST_FILE = 'english-german-test-{}.csv'.format(example_limit)
-
+VALID_FILE = 'english-german-valid-{}.csv'.format(example_limit)
 # load doc into memory
 def load_doc(filename):
 	# open the file as read only
@@ -61,10 +61,14 @@ dataset = raw_dataset[:][ :]
 # random shuffle (optional)
 shuffle(dataset)
 # split into train/test
-ratio = 0.95
-train_size = int(ratio*n_sentences)
-train, test = dataset[:train_size], dataset[train_size:]
+train_ratio = 0.90
+val_test_ratio = 0.5
+train_size = int(train_ratio*n_sentences)
+valid_size = int((1 - train_ratio) * val_test_ratio * n_sentences)
+test_start = train_size + valid_size
+train, valid, test = dataset[:train_size], dataset[train_size:test_start], dataset[test_start:]
 # save
 #save_clean_data(dataset, 'english-german-both.pkl')
 save_clean_data(train, TRAIN_FILE)
 save_clean_data(test, TEST_FILE)
+save_clean_data(valid, VALID_FILE)

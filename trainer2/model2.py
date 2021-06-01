@@ -2,16 +2,15 @@
 
 import tensorflow as tf
 #import numpy as np
-import os
-import time
-from trainer.util import *
-import os.path
+#import os
+#import time
+from trainer2.util2 import get_dataset_params, load_dataset, Decoder
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+#import os.path
 from os import path
 
 def train(args):
     assert not path.exists(args['output_dir']), "Model directory {} exists.".format(args['output_dir'])
-    path.exists(args['full_data_path'])
-    path.exists(args['train_data_path'])
     params = get_dataset_params(args['full_data_path'])
     BATCH_SIZE = args['batch_size']
     embedding_dim = args['embedding_dim']
@@ -26,29 +25,36 @@ def train(args):
     steps_per_epoch = len(input_ndarray_train)//BATCH_SIZE
  
     BUFFER_SIZE = len(input_ndarray_train)
-    encoder = Encoder(vocab_inp_size, embedding_dim, hidden_units_num, BATCH_SIZE)
-    attention_layer = BahdanauAttention(10)
-    #attention_result, attention_weights = attention_layer(sample_hidden, sample_output)
-    decoder = Decoder(vocab_tar_size, embedding_dim, hidden_units_num, BATCH_SIZE)
+
     
-    optimizer = tf.keras.optimizers.Adam()        
-    checkpoint_dir = args['output_dir']
-    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
-    checkpoint = tf.train.Checkpoint(optimizer=optimizer,
-                                     encoder=encoder,
-                                     decoder=decoder)
-    EPOCHS = args['num_epochs']
-    dataset = tf.data.Dataset.from_tensor_slices((input_ndarray_train, target_ndarray_train)).shuffle(BUFFER_SIZE)
+    #optimizer = tf.keras.optimizers.Adam()        
+
+    num_epochs = args['num_epochs']
+    dataset = tf.data.Dataset.from_tensor_slices((input_ndarray_train, 
+                                                  target_ndarray_train)).shuffle(BUFFER_SIZE)
     dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
+    
+    decoder = Decoder(targ_tokenizer, vocab_inp_size, vocab_tar_size, embedding_dim, 
+                      hidden_units_num, BATCH_SIZE)
+    decoder.compile(optimizer='adam', loss='SparseCategoricalCrossentropy', 
+                    metrics=['SparseCategoricalCrossentropy'] )
+    #checkpoint_dir = args['output_dir']
+    #checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+    #checkpoint = tf.train.Checkpoint(optimizer=optimizer,
+    #                                 decoder=decoder)
+    early_stopping = EarlyStopping(monitor='loss', patience=2)
+    decoder.fit(dataset, epochs=num_epochs, steps_per_epoch=steps_per_epoch, 
+                callbacks=[early_stopping])
+    #tf.keras.models.save_model(decoder, args["output_dir"])
+    decoder.save_weights(args['output_dir'])
+    '''
     for epoch in range(EPOCHS):
       start = time.time()
     
-      enc_hidden = encoder.initialize_hidden_state()
       total_loss = 0
     
       for (batch, (inp, targ)) in enumerate(dataset.take(steps_per_epoch)):
-        batch_loss = train_step(inp, targ, enc_hidden, encoder, decoder, 
-                                BATCH_SIZE, targ_tokenizer, optimizer)
+        batch_loss = decoder.train_step(inp, targ)
         total_loss += batch_loss
     
         if batch % 100 == 0:
@@ -59,3 +65,4 @@ def train(args):
     
       print(f'Epoch {epoch+1} Loss {total_loss/steps_per_epoch:.4f}')
       print(f'Time taken for 1 epoch {time.time()-start:.2f} sec\n')
+'''

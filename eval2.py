@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-import numpy as np
+#import numpy as np
 import tensorflow as tf
-from trainer.util import *
+from trainer2.util2 import convert_to_sentence, get_dataset_params, Decoder,
+load_dataset
 from nltk.translate.bleu_score import corpus_bleu
 import os.path
 from os import path
@@ -12,14 +13,12 @@ embedding_dim = 256
 
 example_limit = 1700
 full_data_path = 'english-german-{}.csv'.format(example_limit)
-path.exists(full_data_path)
 train_data_path = 'english-german-train-{}.csv'.format(example_limit)
-path.exists(full_data_path)
 test_data_path = 'english-german-test-{}.csv'.format(example_limit)
-path.exists(test_data_path)
-saved_model_path = './trained_model_{}'.format(example_limit)
-path.exists(saved_model_path)
-test_limit = 5
+saved_model_path = './trained_model2_{}'.format(example_limit)
+test_limit = 100
+
+'''
 #each input is a single example
 def translate(input_indexed, inp_tokenizer, targ_tokenizer, max_length_inp, 
               max_length_targ, encoder, decoder):
@@ -53,25 +52,23 @@ def translate(input_indexed, inp_tokenizer, targ_tokenizer, max_length_inp,
     dec_input = tf.expand_dims([predicted_id], 0)
 
   return predicted_sentence, attention_plot
-
-def predict(inputs_indexed, targets_indexed, params, encoder, decoder):
+'''
+def bleu_score(inputs_indexed, targets_indexed, y_preds_indexed, params):
   targ_sentences, predicted_sentences = list(), list()
-  for i, in_targ_indexed in enumerate(zip(inputs_indexed, targets_indexed)): #because we use special token to mark end of sentence, each indexed sentence has diff len, so can't predict as vector
-    targ_sentence = convert_to_sentence(params['targ_tokenizer'], in_targ_indexed[1])
-    inp_sentence = (convert_to_sentence(params['inp_tokenizer'], in_targ_indexed[0]))
+  for i, input_indexed in enumerate(inputs_indexed): #because we use special token to mark end of sentence, each indexed sentence has diff len, so can't predict as vector
+    targ_sentence = convert_to_sentence(params['targ_tokenizer'], targets_indexed[i])
+    predicted_sentence = convert_to_sentence(params['targ_tokenizer'], y_preds_indexed[i])
+    inp_sentence = (convert_to_sentence(params['inp_tokenizer'], input_indexed))
     targ_sentences.append([targ_sentence.split()[1:-1]])
-    predicted_sentence, attention_plot = translate([in_targ_indexed[0]], 
-                                                   params['inp_tokenizer'], params['targ_tokenizer'], 
-                                                   params['max_length_inp'], params['max_length_targ'], encoder, decoder)
     predicted_sentences.append(predicted_sentence.split()[1:-1])
     if i > test_limit:
-      break
+      return
     if i > 5: #show a preview
-      continue
+      continue;
     print('src=[%s], target=[%s], predicted=[%s]' % (inp_sentence, 
           targ_sentence, predicted_sentence))
-    attention_plot = attention_plot[:len(predicted_sentence.split(' ')),
-                                  :len(targ_sentence.split(' '))]
+    #attention_plot = attention_plot[:len(predicted_sentence.split(' ')),
+    #                              :len(targ_sentence.split(' '))]
     #plot_attention(attention_plot, targ_sentence.split(' '), predicted_sentence.split(' ')) 
 
   print('BLEU-1: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(1.0, 0, 0, 0)))
@@ -86,18 +83,28 @@ def evaluate():
   targ_tokenizer = params['targ_tokenizer']
   train_inputs_indexed, train_targets_indexed = load_dataset(inp_tokenizer, 
                                                  targ_tokenizer, train_data_path)
-  encoder = Encoder(params['vocab_inp_size'], embedding_dim, hidden_units_num, BATCH_SIZE)
-  decoder = Decoder(params['vocab_tar_size'] , embedding_dim, hidden_units_num, BATCH_SIZE)  
-  optimizer = tf.keras.optimizers.Adam()
-  checkpoint = tf.train.Checkpoint(optimizer=optimizer,
-                                 encoder=encoder,
-                                 decoder=decoder)  
+  #optimizer = tf.keras.optimizers.Adam()
+  #checkpoint = tf.train.Checkpoint(optimizer=optimizer,
+  #                               encoder=encoder,
+  #                               decoder=decoder)  
   # restoring the latest checkpoint in checkpoint_dir
-  #checkpoint.restore(tf.train.latest_checkpoint(saved_model_path)).expect_partial()  
-  checkpoint.restore(tf.train.latest_checkpoint(saved_model_path))  
-  predict(train_inputs_indexed, train_targets_indexed, params, encoder, decoder)
+  #checkpoint.restore(tf.train.latest_checkpoint(saved_model_path))  
+  BUFFER_SIZE = len(train_inputs_indexed)
+  decoder = Decoder(targ_tokenizer, params['vocab_inp_size'], params['vocab_tar_size'], embedding_dim, hidden_units_num, BATCH_SIZE)
+  dataset_train = tf.data.Dataset.from_tensor_slices((train_inputs_indexed, 
+                                                  train_targets_indexed)).shuffle(BUFFER_SIZE)
+  dataset_train = dataset_train.batch(BATCH_SIZE, drop_remainder=True)
+  #test=decoder(train_inputs_indexed)
+  y_preds_indexed = decoder.predict(dataset_train)
+
+  bleu_score(train_inputs_indexed, train_targets_indexed, y_preds_indexed, params)
   test_inputs_indexed, test_targets_indexed = load_dataset(inp_tokenizer, 
                                                  targ_tokenizer, test_data_path)  
-  predict(test_inputs_indexed, test_targets_indexed, params, encoder, decoder)
+  dataset_test = tf.data.Dataset.from_tensor_slices((test_inputs_indexed, 
+                                                  test_targets_indexed)).shuffle(BUFFER_SIZE)
+  dataset_test = dataset_train.batch(BATCH_SIZE, drop_remainder=True)
+ 
+  y_preds_indexed = decoder.predict(dataset_test)
+  bleu_score(test_inputs_indexed, test_targets_indexed, y_preds_indexed, params)
 evaluate()
  

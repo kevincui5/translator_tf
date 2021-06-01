@@ -175,7 +175,7 @@ class Decoder(tf.keras.Model):
     # output shape == (batch_size * 1, hidden_size)
     output = tf.reshape(output, (-1, output.shape[2]))
 
-    # output shape == (batch_size, vocab)
+    # x shape == (batch_size, vocab_tar_size)
     x = self.fc(output)
 
     return x, state, attention_weights
@@ -205,9 +205,9 @@ def train_step(inp, targ, enc_hidden, encoder, decoder, BATCH_SIZE,
 
     # Teacher forcing - feeding the target (ground truth) as the next decoder input
     for t in range(1, targ.shape[1]):
-      # passing enc_output to the decoder
+      # passing enc_output to the decoder. predictions shape == (batch_size, vocab_tar_size)
       predictions, dec_hidden, _ = decoder(dec_input, dec_hidden, enc_output) #throws away attension weights
-
+      #targ shape == (batch_size, ty)
       loss += loss_function(targ[:, t], predictions) #take parameters of ground truth and prediction
 
       # using teacher forcing
