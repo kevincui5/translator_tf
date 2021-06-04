@@ -5,6 +5,8 @@ import re
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from nltk.translate.bleu_score import corpus_bleu
+import os
 
 # Converts the unicode file to ascii
 def unicode_to_ascii(s):
@@ -127,9 +129,9 @@ class BahdanauAttention(tf.keras.layers.Layer):
     return context_vector, attention_weights
 
 class Encoder(tf.keras.Model):
-  def __init__(self, vocab_size, embedding_dim, enc_units, batch_sz):
+  def __init__(self, vocab_size, embedding_dim, enc_units):
     super(Encoder, self).__init__()
-    self.batch_sz = batch_sz
+    self.batch_sz = None
     self.enc_units = enc_units
     self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
     self.gru = tf.keras.layers.GRU(self.enc_units,
@@ -145,174 +147,137 @@ class Encoder(tf.keras.Model):
 
   def initialize_hidden_state(self):
     return tf.zeros((self.batch_sz, self.enc_units))
+  
+  def set_batch_size(self, batch_sz):
+    self.batch_sz = batch_sz
 
 class Decoder(tf.keras.Model):
-  def __init__(self, targ_tokenizer, vocab_inp_size, vocab_tar_size, 
+  def __init__(self, encoder, targ_tokenizer, vocab_inp_size, vocab_tar_size, 
                embedding_dim, dec_units, batch_sz):
-      super(Decoder, self).__init__()
-      self.batch_sz = batch_sz
-      self.dec_units = dec_units
-      self.embedding = tf.keras.layers.Embedding(vocab_tar_size, embedding_dim)
-      self.gru = tf.keras.layers.GRU(self.dec_units,
-                                     return_sequences=True,
-                                     return_state=True,
-                                     recurrent_initializer='glorot_uniform')
-      self.fc = tf.keras.layers.Dense(vocab_tar_size)        
-      # used for attention
-      self.attention = BahdanauAttention(self.dec_units)
-      self.encoder = Encoder(vocab_inp_size, embedding_dim, dec_units, 
-                             self.batch_sz) #encoder use same hidden units for now
-      self.targ_tokenizer = targ_tokenizer
-      self.enc_output = None  #(batch_size,Tx,dec_units)
-      self.dec_hidden = None # (batch_size,dec_units)
-      #self.optimizer = optimizer
-        
+    super(Decoder, self).__init__()
+    self.batch_sz = batch_sz
+    self.dec_units = dec_units
+    self.embedding = tf.keras.layers.Embedding(vocab_tar_size, embedding_dim)
+    self.gru = tf.keras.layers.GRU(self.dec_units,
+                                   return_sequences=True,
+                                   return_state=True,
+                                   recurrent_initializer='glorot_uniform')
+    self.fc = tf.keras.layers.Dense(vocab_tar_size)        
+    self.attention = BahdanauAttention(self.dec_units)
+    self.encoder = encoder
+    self.encoder.batch_sz = batch_sz
+    self.targ_tokenizer = targ_tokenizer
+    #will be set after encoder call fun called.  need to be done manually
+    self.enc_output = None  #(batch_size,Tx,dec_units)
+    self.dec_hidden = None # (batch_size,dec_units)
+    #self.all_variables = self.attention.trainable_variables + self.encoder.trainable_variables + self.trainable_variables
+    
+ # def refresh_all_variable(self):
+  #  self.all_variables = self.attention.trainable_variables + self.encoder.trainable_variables + self.trainable_variables
+  def set_batch_size(self, batch_sz):
+    self.batch_sz = batch_sz
+    
+  def get_encoder(self):
+    return self.encoder
+  
+  def get_attention(self):
+    return self.attention
+  
   def call(self, x):
-      # enc_output shape == (batch_size, max_length, hidden_size)
-      context_vector, attention_weights = self.attention(self.dec_hidden, self.enc_output)
-      
-      # x shape after passing through embedding == (batch_size, 1, embedding_dim)
-      x = self.embedding(x)
-      
-      # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
-      x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
-      
-      # passing the concatenated vector to the GRU
-      output, state = self.gru(x)
-      
-      # output shape == (batch_size * 1, hidden_size)
-      output = tf.reshape(output, (-1, output.shape[2]))
-      
-      # x shape == (batch_size, vocab_tar_size)
-      x = self.fc(output)
-      
-      return x, state, attention_weights
-      
+    # enc_output shape == (batch_size, max_length, hidden_size)
+    context_vector, attention_weights = self.attention(self.dec_hidden, self.enc_output)
+    
+    # x shape after passing through embedding == (batch_size, 1, embedding_dim)
+    x = self.embedding(x)
+  # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
+    x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
+    
+    # passing the concatenated vector to the GRU
+    output, state = self.gru(x)
+    
+    # output shape == (batch_size * 1, hidden_size)
+    output = tf.reshape(output, (-1, output.shape[2]))
+    
+    # x shape == (batch_size, vocab_tar_size)
+    x = self.fc(output)
+    return x, state, attention_weights
+  
+  #override  
   def train_step(self, data): #data shape (tensor shape(batch_size,Tx),tensor shape(batch_size,Ty))
     loss = 0
     inp, targ, sample_weight = tf.keras.utils.unpack_x_y_sample_weight(data)
     #inp shape (batch_size,Tx), targ shape (batch_size,Ty)
-
     with tf.GradientTape() as tape:
-      self.enc_output, enc_hidden = self.encoder(inp)
-  
-      self.dec_hidden = enc_hidden
-      #insert a length 1 axis at 2nd dimension, meaning use a start word id as each training example
-      dec_input = tf.expand_dims([self.targ_tokenizer.word_index['<start>']] * self.batch_sz, 1) 
-      y_pred = []
-      # Teacher forcing - feeding the target (ground truth) as the next decoder input
-      for t in range(1, targ.shape[1]):   #targ.shape[1] is Ty
-        # passing enc_output to the decoder. prediction shape == (batch_size, vocab_tar_size)
-        prediction, dec_hidden, _ = self(dec_input) #dec_input shape == (batch_size,1). throws away attension weights
-        y_pred.append(prediction)
-        #targ shape == (batch_size, ty)
-        #loss += self.loss_function(targ[:, t], prediction) #take parameters of ground truth and prediction
-        loss += self.compiled_loss(targ[:, t], y_pred, regularization_losses=self.losses)
-         
-        # using teacher forcing
-        dec_input = tf.expand_dims(targ[:, t], 1)  # targ[:, t] is y
-      y_pred = tf.concat(y_pred, axis=0)   #y_pred (list of Ty tensors) shape (Ty, batch_size, vocab_tar_size) -> (Ty*batch_size, vocab_tar_size)
-
-      y_pred = tf.reshape(y_pred, [self.batch_sz, targ.shape[1]-1, y_pred.shape[1]]) #(batch_size,Ty,vocab_tar_size)
-    #because of teacher's forcing, targ shape has 1 more y_pred along Ty axis 
-    targ = targ[:,1:]
-    batch_loss = (loss / int(targ.shape[1]))
-  
-    variables = self.encoder.trainable_variables + self.trainable_variables
-  
-    gradients = tape.gradient(loss, variables)
-  
-    self.optimizer.apply_gradients(zip(gradients, variables))
-    self.compiled_metrics.update_state(targ, y_pred)
+      loss, y_pred = self.helper(data, True, 'called by train_step')
+    #loss = self.compiled_loss(targ, y_pred, regularization_losses=self.losses)
+    #self.refresh_all_variable()
+    all_variables = self.encoder.trainable_variables + self.trainable_variables + self.attention.trainable_variables
+    gradients = tape.gradient(loss, all_variables)
+    self.optimizer.apply_gradients(zip(gradients, all_variables))
+    #self.compiled_metrics.update_state(targ, y_pred) #will overwrite and make training worse
     return {m.name: m.result() for m in self.metrics} 
-    #return batch_loss
-  
+
+  #override    
   def predict_step(self, data):
     """The logic for one inference step.
     This method overridde that of Keras.Model to support one step translation,
     the forward pass.
     Args:
+      data: A nested structure of `Tensor`s in batch
+    Returns:
+      The one hot prediction.
+    """  
+    y_pred = self.helper(data, False, 'predict_step')
+    return y_pred
+
+  #override    
+  def test_step(self, data):
+    """The logic for one evaluation step.
+    This method overridde that of Keras.Model to support one step evaluationlogic,
+    that is, the forward pass, loss calculation, and metrics updates.
+    Args:
       data: A nested structure of `Tensor`s.
     Returns:
-      The translated sentences.
-    """  
-    inp, targ, sample_weigh = tf.keras.utils.unpack_x_y_sample_weight(data)
-    #if (not isinstance(t, tf.Tensor) or
-    #  (not isinstance(t.shape, tf.TensorShape)) or t.shape.rank != 1):
-    #  return
-    #inp = tf.expand_dims(inp, 1)
+      metrics.
+    """   
+    self.helper(data, False, 'by test_step')
+
+
+    return {m.name: m.result() for m in self.metrics}
+  
+  def helper(self, data, train_mode, who_called):
+    inp, targ, sample_weight = tf.keras.utils.unpack_x_y_sample_weight(data)
+
     self.enc_output, enc_hidden = self.encoder(inp)
-    self.dec_hidden = enc_hidden # (batch_size,dec_units)
-    dec_input = tf.expand_dims([self.targ_tokenizer.word_index['<start>']] * self.batch_sz, 1) 
+    self.dec_hidden = enc_hidden # (batch_size,dec_units)  #if encoder and decoder hidden units # diff, need to initialize dec_hidden accordingly
+    dec_input = tf.expand_dims(targ[:,0], 1) 
     y_pred = []
-    for t in range(targ.shape[1]):
-      #dec_input shape == (batch_size,1)
+    loss = 0
+    for t in range(targ.shape[1]):   #targ.shape[1] is Ty
+      # passing enc_output to the decoder. prediction shape == (batch_size, vocab_tar_size)
       prediction, dec_hidden, _ = self(dec_input) #throws away attension weights
-      predicted_id = tf.math.argmax(prediction, 1)
-      #predicted_word = self.targ_tokenizer.index_word[predicted_id]
-      #predicted_sentence += predicted_word + ' '
-      #if predicted_word == '<end>':
-      #  return predicted_sentence
-      dec_input = tf.expand_dims(predicted_id, 1)
-      y_pred.append(dec_input)
+      y_pred.append(prediction)
+      if(train_mode):
+      # Teacher forcing - feeding the target (ground truth) as the next decoder input
+        loss += self.compiled_loss(targ[:, t ], prediction, regularization_losses=self.losses)
+        if(t + 1 < targ.shape[1]):
+          dec_input = tf.expand_dims(targ[:, t + 1], 1)  # targ[:, t] is y
+
+      else:
+        predicted_id = tf.math.argmax(prediction, axis=-1) #predicted_id shape == (batch_size, 1)
+        dec_input = tf.expand_dims(predicted_id, 1)
+        print(t)
+        print (self.losses)
+        self.compiled_loss(targ[:, t], prediction, regularization_losses=self.losses)
+      self.compiled_metrics.update_state(targ[:, t], prediction)
+      # the predicted ID is fed back into the model
     y_pred = tf.concat(y_pred, axis=0)   #y_pred (list of Ty tensors) shape (Ty, batch_size, 1) -> (Ty*batch_size, 1)
-#    y_pred = tf.reshape(y_pred, [self.batch_sz, targ.shape[1], y_pred.shape[1]]) #(batch_size,Ty,vocab_tar_size)
-    y_pred = tf.reshape(y_pred, [self.batch_sz, targ.shape[1]]) #(batch_size,Ty,vocab_tar_size)
-    return tf.convert_to_tensor(y_pred)
-  '''  
-    def test_step(self, data):
-      """The logic for one evaluation step.
-      This method overridde that of Keras.Model to support one step evaluationlogic,
-      that is, the forward pass, loss calculation, and metrics updates.
-      Args:
-        data: A nested structure of `Tensor`s.
-      Returns:
-        metrics.
-      """   
-      inp, targ, sample_weight = tf.keras.utils.unpack_x_y_sample_weight(data)
+    y_pred = tf.reshape(y_pred, [self.batch_sz, targ.shape[1], y_pred.shape[1]]) #(batch_size,Ty,vocab_tar_size)
 
-      self.enc_output, enc_hidden = self.encoder(inp)
-      dec_input = tf.expand_dims([self.targ_tokenizer.word_index['<start>']] * self.batch_sz, 1) 
-      for t in range(targ.shape[1]):   #targ.shape[1] is Ty
-        # passing enc_output to the decoder. prediction shape == (batch_size, vocab_tar_size)
-        prediction, dec_hidden, _ = self(dec_input) #throws away attension weights
-        predicted_id = tf.math.argmax(prediction, axis=1).numpy() #predicted_id shape == (batch_size, 1)
-        predicted_word = targ_tokenizer.index_word[predicted_id]
-    predicted_sentence += predicted_word + ' '
-
-    if predicted_word == '<end>':
-      return predicted_sentence, attention_plot
-
-    # the predicted ID is fed back into the model
-    dec_input = tf.expand_dims([predicted_id], 0)
-      self.compiled_loss(y, y_pred, regularization_losses=self.losses)
-      self.compiled_metrics.update_state(y, y_pred)
-      return {m.name: m.result() for m in self.metrics}
-      #return batch_loss
-  '''
-
-  def predict_step_one_example(self, inp, max_len_out):
-    '''
-    Helper function to be called by test_step and predict_step
-    It pass one test example through forward pass
-    Args:
-      inp with dimention of (Tx,).
-    Returns:
-      A translated sentence.
-    '''
-    inp = tf.expand_dims(inp, 0)
-    self.enc_output, enc_hidden = self.encoder(inp)
-    dec_input = tf.expand_dims([self.targ_tokenizer.word_index['<start>']], 0)  #no need to multiply batch size because it's single example
-    predicted_sentence = '<start> '
-    for t in range(max_len_out):
-      prediction, dec_hidden, _ = self(dec_input) #throws away attension weights
-      predicted_id = tf.math.argmax(prediction[0]).numpy()
-      predicted_word = self.targ_tokenizer.index_word[predicted_id]
-      predicted_sentence += predicted_word + ' '
-      if predicted_word == '<end>':
-        return predicted_sentence
-      dec_input = tf.expand_dims([predicted_id], 0)
-    return predicted_sentence
+    if train_mode:
+      return loss, y_pred #y_pred for debugging purpose
+    else:
+      return y_pred
   
   def loss_function(self, real, pred):
     mask = tf.math.logical_not(tf.math.equal(real, 0))
@@ -324,9 +289,20 @@ class Decoder(tf.keras.Model):
     loss_ *= mask
   
     return tf.reduce_mean(loss_)
-
-
-
+  def get_optimizer(self):
+    return self.optimizer
+  
+  #a customized callback saving models
+class SaveCheckpoint(tf.keras.callbacks.Callback):
+  def __init__(self, encoder, decoder, optimizer, path):
+    super(SaveCheckpoint, self).__init__()      
+    self.checkpoint_prefix = os.path.join(path, "ckpt")
+    self.checkpoint = tf.train.Checkpoint(optimizer=optimizer, 
+                                     encoder=encoder, decoder=decoder)
+  def on_epoch_end(self, epoch, logs=None):
+    if (epoch + 1) % 2 == 0:
+      self.checkpoint.save(file_prefix=self.checkpoint_prefix)
+      
 # function for plotting the attention weights
 def plot_attention(attention, sentence, predicted_sentence):
   fig = plt.figure(figsize=(10, 10))
@@ -342,3 +318,28 @@ def plot_attention(attention, sentence, predicted_sentence):
   ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
 
   plt.show()
+
+def bleu_score(inputs_indexed, targets_indexed, y_preds_indexed, params):
+  targ_sentences, predicted_sentences = list(), list()
+  assert(len(inputs_indexed) == len(targets_indexed) == len(y_preds_indexed))
+  for i, input_indexed in enumerate(inputs_indexed): #because we use special token to mark end of sentence, each indexed sentence has diff len, so can't predict as vector
+    targ_sentence = convert_to_sentence(params['targ_tokenizer'], targets_indexed[i])
+    predicted_sentence = convert_to_sentence(params['targ_tokenizer'], y_preds_indexed[i])
+    inp_sentence = (convert_to_sentence(params['inp_tokenizer'], input_indexed))
+    targ_sentences.append([targ_sentence.split()[1:-1]])
+    predicted_sentences.append(predicted_sentence.split()[1:-1])
+    #if i > test_limit:
+    #  return
+    if i > 5: #show a preview
+      continue;
+    print('src=[%s], target=[%s], predicted=[%s]' % (inp_sentence, 
+          targ_sentence, predicted_sentence))
+    #attention_plot = attention_plot[:len(predicted_sentence.split(' ')),
+    #                              :len(targ_sentence.split(' '))]
+    #plot_attention(attention_plot, targ_sentence.split(' '), predicted_sentence.split(' ')) 
+
+  print('BLEU-1: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(1.0, 0, 0, 0)))
+  print('BLEU-2: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.5, 0.5, 0, 0)))
+  print('BLEU-3: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.3, 0.3, 0.3, 0)))
+  print('BLEU-4: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.25, 0.25, 0.25, 0.25)))
+

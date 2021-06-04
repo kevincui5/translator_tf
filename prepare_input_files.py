@@ -11,7 +11,7 @@ from numpy.random import shuffle
 #from trainer.util import *
 
 RAW_FILE = 'deu.txt'
-example_limit = 1700
+example_limit = 10000
 FULL_DATA_FILE = 'english-german-{}.csv'.format(example_limit)
 TRAIN_FILE = 'english-german-train-{}.csv'.format(example_limit)
 TEST_FILE = 'english-german-test-{}.csv'.format(example_limit)

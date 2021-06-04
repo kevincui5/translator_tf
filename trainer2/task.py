@@ -18,6 +18,10 @@ if __name__ == "__main__":
         help="GCS location of training data",
     )
     parser.add_argument(
+        "--valid_data_path",
+        help="GCS location of validation data",
+    )
+    parser.add_argument(
         "--output_dir",
         help="GCS location to write checkpoints and export models",
         required=True
