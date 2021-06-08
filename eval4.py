@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import tensorflow as tf
-from trainer.util import *
+from trainer4.util import *
 from nltk.translate.bleu_score import corpus_bleu
 import os.path
 from os import path
@@ -10,14 +10,14 @@ hidden_units_num = 1024
 BATCH_SIZE = 256
 embedding_dim = 256
 
-example_limit = 40000
+example_limit = 1700
 full_data_path = 'english-german-{}.csv'.format(example_limit)
 path.exists(full_data_path)
 train_data_path = 'english-german-train-{}.csv'.format(example_limit)
 path.exists(full_data_path)
 test_data_path = 'english-german-test-{}.csv'.format(example_limit)
 path.exists(test_data_path)
-saved_model_path = './trained_model_{}'.format(example_limit)
+saved_model_path = './trained_model4_{}'.format(example_limit)
 path.exists(saved_model_path)
 test_limit = 500
 #each input is a single example
@@ -29,18 +29,20 @@ def translate(input_indexed, inp_tokenizer, targ_tokenizer, max_length_inp,
   #cant use encoder.initialize_hidden_state() because for single example need manually initialize shape[0] to 1
   init_enc_hidden_states = [tf.zeros((1, hidden_units_num))]
 
-  enc_out, enc_hidden_states = encoder(input_tensor, init_enc_hidden_states)
+  enc_out, enc_hidden_states, enc_cell = encoder(input_tensor, init_enc_hidden_states)
 
   init_dec_hidden_states = enc_hidden_states
+  init_dec_cell = enc_cell
   dec_input = tf.expand_dims([targ_tokenizer.word_index['<start>']], 0)  #no need to multiply batch size because it's single example
   predicted_sentence = '<start> '
   dec_hidden = init_dec_hidden_states
+  dec_cell = init_dec_cell
   for t in range(max_length_targ):
-    prediction, dec_hidden, attention_weights = decoder(dec_input,
-                                                         dec_hidden,
+    prediction, dec_hidden, dec_cell, _ = decoder(dec_input,
+                                                         dec_hidden, dec_cell,
                                                          enc_out)
     # storing the attention weights to plot later on
-    attention_weights = tf.reshape(attention_weights, (-1, ))
+    #attention_weights = tf.reshape(attention_weights, (-1, ))
     #attention_plot[t] = attention_weights.numpy()
     predicted_id = tf.math.argmax(prediction[0]).numpy()
     predicted_word = targ_tokenizer.index_word[predicted_id]

@@ -259,8 +259,8 @@ class Decoder(tf.keras.Model):
       y_pred.append(prediction)
       if(train_mode):
       # Teacher forcing - feeding the target (ground truth) as the next decoder input
-        loss += self.compiled_loss(targ[:, t ], prediction, regularization_losses=self.losses)
         if(t + 1 < targ.shape[1]):
+          loss += self.compiled_loss(targ[:, t + 1], prediction, regularization_losses=self.losses)
           dec_input = tf.expand_dims(targ[:, t + 1], 1)  # targ[:, t] is y
 
       else:

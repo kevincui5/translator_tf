@@ -1,0 +1,24 @@
+both encoder and decoder use GRU single layer
+
+trial from trainer1
+training examples 1700
+BLEU-1: 0.337187
+BLEU-2: 0.150184
+BLEU-3: 0.079000
+BLEU-4: 0.023919
+
+BLEU-1: 0.314869
+BLEU-2: 0.092428
+BLEU-3: 0.000000
+BLEU-4: 0.000000
+
+trail from trainer 4
+BLEU-1: 0.538687
+BLEU-2: 0.291647
+BLEU-3: 0.218193
+BLEU-4: 0.119856
+
+BLEU-1: 0.414557
+BLEU-2: 0.169452
+BLEU-3: 0.076513
+BLEU-4: 0.000000

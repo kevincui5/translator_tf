@@ -5,7 +5,7 @@ import re
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-
+from tensorflow.keras.layers import Bidirectional, LSTM, Concatenate
 # Converts the unicode file to ascii
 def unicode_to_ascii(s):
   return ''.join(c for c in unicodedata.normalize('NFD', s)
@@ -97,23 +97,28 @@ def convert_to_sentence(tokenizer, tensor):
   return sentence
 
 class Encoder(tf.keras.Model):
-  def __init__(self, vocab_size, embedding_dim, enc_units, batch_sz):
+  def __init__(self, vocab_size, embedding_dim, enc_units_num, batch_sz):
     super(Encoder, self).__init__()
     self.batch_sz = batch_sz
-    self.enc_units = enc_units
+    self.enc_units_num = enc_units_num
     self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-    self.gru = tf.keras.layers.GRU(self.enc_units,
+    self.gru = tf.keras.layers.GRU(self.enc_units_num,
                                    return_sequences=True,
                                    return_state=True,
                                    recurrent_initializer='glorot_uniform')
-
+    self.bi_LSTM_last = Bidirectional(LSTM(enc_units_num, return_sequences=True, 
+                                      return_state = True))
   def call(self, x, hidden):
     x = self.embedding(x)
-    output, state = self.gru(x, initial_state=hidden)
-    return output, state
+    #output, state = self.gru(x, initial_state=hidden)
+    encoder_output, hidden_fwd, cell_fwd, hidden_bwd, cell_bwd = self.bi_LSTM_last(x)
+    hidden = Concatenate(axis=-1)([hidden_fwd, hidden_bwd])
+    cell = Concatenate(axis=-1)([cell_fwd, cell_bwd])
+    output = x
+    return output, hidden, cell
 
   def initialize_hidden_state(self):
-    return tf.zeros((self.batch_sz, self.enc_units))
+    return tf.zeros((self.batch_sz, self.enc_units_num))
 
 class BahdanauAttention(tf.keras.layers.Layer):
   def __init__(self, units):
@@ -150,16 +155,17 @@ class Decoder(tf.keras.Model):
     self.batch_sz = batch_sz
     self.dec_units = dec_units
     self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-    self.gru = tf.keras.layers.GRU(self.dec_units,
-                                   return_sequences=True,
-                                   return_state=True,
-                                   recurrent_initializer='glorot_uniform')
+#    self.gru = tf.keras.layers.GRU(self.dec_units,
+#                                   return_sequences=True,
+#                                   return_state=True,
+#                                   recurrent_initializer='glorot_uniform')
+    self.lstm = LSTM(self.dec_units*2, return_state=True)
     self.fc = tf.keras.layers.Dense(vocab_size)
 
     # used for attention
     self.attention = BahdanauAttention(self.dec_units)
 
-  def call(self, x, hidden, enc_output):
+  def call(self, x, hidden, cell, enc_output):
     # enc_output shape == (batch_size, max_length, hidden_size)
     context_vector, attention_weights = self.attention(hidden, enc_output)
 
@@ -170,15 +176,16 @@ class Decoder(tf.keras.Model):
     x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
 
     # passing the concatenated vector to the GRU
-    output, state = self.gru(x)
-
+    #output, state = self.gru(x)
+    #output and hidden are the same here because only return_state is set true
+    output, hidden, cell = self.lstm(x, initial_state = [hidden, cell])
     # output shape == (batch_size * 1, hidden_size)
-    output = tf.reshape(output, (-1, output.shape[2]))
+    #output = tf.reshape(output, (-1, output.shape[2]))
 
     # x shape == (batch_size, vocab_tar_size)
     x = self.fc(output)
 
-    return x, state, attention_weights
+    return x, hidden, cell, attention_weights
 
 def loss_function(real, pred):
   mask = tf.math.logical_not(tf.math.equal(real, 0))
@@ -197,14 +204,16 @@ def train_step(inp, targ, enc_hidden, encoder, decoder, BATCH_SIZE,
   loss = 0
 
   with tf.GradientTape() as tape:
-    enc_output, enc_hidden = encoder(inp, enc_hidden)
+    enc_output, enc_hidden, enc_cell = encoder(inp, enc_hidden)
 
     dec_hidden = enc_hidden
+    dec_cell = enc_cell
     dec_input = tf.expand_dims(targ[:,0], 1) 
     # Teacher forcing - feeding the target (ground truth) as the next decoder input
     for t in range(targ.shape[1]):
       # passing enc_output to the decoder. predictions shape == (batch_size, vocab_tar_size)
-      predictions, dec_hidden, _ = decoder(dec_input, dec_hidden, enc_output) #throws away attension weights
+      predictions, dec_hidden, dec_cell, _ = decoder(dec_input, dec_hidden,
+                                                     dec_cell, enc_output) #throws away attension weights
       #targ shape == (batch_size, ty)
       if t + 1 < targ.shape[1]:
           loss += loss_function(targ[:, t+1], predictions) #take parameters of ground truth and prediction
