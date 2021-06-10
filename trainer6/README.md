@@ -1,0 +1,1 @@
+copied from trainer4, frist try to let decoder init fun take encoder reference
