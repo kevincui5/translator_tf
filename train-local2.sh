@@ -1,9 +1,9 @@
 #!/bin/bash
 set -ev
 
-export example_limit=10000
+export example_limit=1700
 
-echo "Training local ML model"
+echo "Training local ML model 2"
 gcloud ai-platform local train \
         --module-name=trainer2.task \
         --package-path="./trainer2" \

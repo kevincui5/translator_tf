@@ -28,6 +28,10 @@ if __name__ == "__main__":
         required=True
     )
     parser.add_argument(
+        "--valid_data_path",
+        help="GCS location of validation data",
+    )
+    parser.add_argument(
         "--batch_size",
         help="Number of examples to compute gradient over.",
         type=int,

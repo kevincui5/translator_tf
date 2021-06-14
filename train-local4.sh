@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ev
 
-export example_limit=1700
+export example_limit=40000
 
 echo "Training local ML model 4"
 gcloud ai-platform local train \

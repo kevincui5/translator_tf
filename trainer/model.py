@@ -26,12 +26,13 @@ def train(args):
     steps_per_epoch = len(input_ndarray_train)//BATCH_SIZE
  
     BUFFER_SIZE = len(input_ndarray_train)
-    encoder = Encoder(vocab_inp_size, embedding_dim, hidden_units_num, BATCH_SIZE)
-    attention_layer = BahdanauAttention(10)
-    #attention_result, attention_weights = attention_layer(sample_hidden, sample_output)
-    decoder = Decoder(vocab_tar_size, embedding_dim, hidden_units_num, BATCH_SIZE)
-    
-    optimizer = tf.keras.optimizers.Adam()        
+    mirrored_strategy = tf.distribute.MirroredStrategy()
+    with mirrored_strategy.scope():
+        encoder = Encoder(vocab_inp_size, embedding_dim, hidden_units_num, BATCH_SIZE)
+        attention_layer = BahdanauAttention(10)
+        #attention_result, attention_weights = attention_layer(sample_hidden, sample_output)
+        decoder = Decoder(vocab_tar_size, embedding_dim, hidden_units_num, BATCH_SIZE)    
+        optimizer = tf.keras.optimizers.Adam()        
     checkpoint_dir = args['output_dir']
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
     checkpoint = tf.train.Checkpoint(optimizer=optimizer,

@@ -10,7 +10,7 @@ hidden_units_num = 1024
 BATCH_SIZE = 256
 embedding_dim = 256
 
-example_limit = 1700
+example_limit = 40000
 full_data_path = 'english-german-{}.csv'.format(example_limit)
 path.exists(full_data_path)
 train_data_path = 'english-german-train-{}.csv'.format(example_limit)
@@ -76,21 +76,30 @@ def predict(inputs_indexed, targets_indexed, params, encoder, decoder):
                                   :len(targ_sentence.split(' '))]
     #plot_attention(attention_plot, targ_sentence.split(' '), predicted_sentence.split(' ')) 
 
-  print('BLEU-1: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(1.0, 0, 0, 0)))
-  print('BLEU-2: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.5, 0.5, 0, 0)))
-  print('BLEU-3: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.3, 0.3, 0.3, 0)))
-  print('BLEU-4: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.25, 0.25, 0.25, 0.25)))
+  print('BLEU-1: %f' % corpus_bleu(targ_sentences, predicted_sentences, 
+                                   weights=(1.0, 0, 0, 0)))
+  print('BLEU-2: %f' % corpus_bleu(targ_sentences, predicted_sentences, 
+                                   weights=(0.5, 0.5, 0, 0)))
+  print('BLEU-3: %f' % corpus_bleu(targ_sentences, predicted_sentences, 
+                                   weights=(0.3, 0.3, 0.3, 0)))
+  print('BLEU-4: %f' % corpus_bleu(targ_sentences, predicted_sentences, 
+                                   weights=(0.25, 0.25, 0.25, 0.25)))
 
   
 def evaluate():
   params = get_dataset_params(full_data_path)  
   inp_tokenizer = params['inp_tokenizer']
   targ_tokenizer = params['targ_tokenizer']
+  max_length_inp = params['max_length_inp']
   train_inputs_indexed, train_targets_indexed = load_dataset(inp_tokenizer, 
                                                  targ_tokenizer, train_data_path)
-  encoder = Encoder(params['vocab_inp_size'], embedding_dim, hidden_units_num, BATCH_SIZE)
-  decoder = Decoder(params['vocab_tar_size'] , embedding_dim, hidden_units_num, BATCH_SIZE)  
-  optimizer = tf.keras.optimizers.Adam()
+  mirrored_strategy = tf.distribute.MirroredStrategy()
+  with mirrored_strategy.scope():
+    encoder = Encoder(params['vocab_inp_size'], embedding_dim, hidden_units_num, 
+                      max_length_inp, BATCH_SIZE)
+    decoder = Decoder(params['vocab_tar_size'] , embedding_dim, hidden_units_num, 
+                      BATCH_SIZE)  
+    optimizer = tf.keras.optimizers.Adam()
   checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
                                  decoder=decoder)  
