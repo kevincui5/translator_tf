@@ -2,13 +2,11 @@
 
 import string
 import re
-#from pickle import dump
 from unicodedata import normalize
 from numpy import array
 import numpy as np
 from numpy.random import rand
 from numpy.random import shuffle
-#from trainer.util import *
 
 RAW_FILE = 'deu.txt'
 example_limit = 40000

@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-import numpy as np
-import tensorflow as tf
-from trainer6.util import convert_to_sentence, get_dataset_params, load_dataset, Translator, bleu_score
+from trainer6.util import convert_to_sentence, get_dataset_params, load_dataset, build_model
 import os.path
 from tensorflow.data import Dataset
 from nltk.translate.bleu_score import corpus_bleu
 
 hidden_units_num = 1024
-BATCH_SIZE = 84
+BATCH_SIZE = 256
 embedding_dim = 256
 
 example_limit = 40000
@@ -23,7 +21,7 @@ def predict(inputs_indexed, targets_indexed, params, model):
     targ_sentence = convert_to_sentence(params['targ_tokenizer'], in_targ_indexed[1])
     inp_sentence = (convert_to_sentence(params['inp_tokenizer'], in_targ_indexed[0]))
     targ_sentences.append([targ_sentence.split()[1:-1]])
-    predicted_sentence, attention_plot = model.custom_eval([in_targ_indexed[0]], 
+    predicted_sentence, attention_plot = model.translate([in_targ_indexed[0]], 
                                                    params['inp_tokenizer'], params['targ_tokenizer'], 
                                                    params['max_length_inp'], params['max_length_targ'],
                                                    hidden_units_num)
@@ -55,37 +53,17 @@ def evaluate():
                                                  targ_tokenizer, train_data_path)
  
   BUFFER_SIZE = len(train_inputs_indexed)
-  model = Translator(vocab_inp_size, vocab_tar_size, embedding_dim, hidden_units_num)
-  #decoder.load_weights(saved_model_path)
-  optimizer = tf.keras.optimizers.Adam()
-  #work around from https://gist.github.com/yoshihikoueno/4ff0694339f88d579bb3d9b07e609122
-#  optimizer = tf.keras.optimizers.Adam(
-#    learning_rate=tf.Variable(0.001),
-#    beta_1=tf.Variable(0.9),
-#    beta_2=tf.Variable(0.999),
-#    epsilon=tf.Variable(1e-7),
-#  )
-#  optimizer.iterations  # this access will invoke optimizer._iterations method and create optimizer.iter attribute
-#  optimizer.decay = tf.Variable(0.0)  # Adam.__init__ assumes ``decay`` is a float object, so this needs to be converted to tf.Variable **after** __init__ method.
-
-  #checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)  
-  #restoring the latest checkpoint in checkpoint_dir
-  #checkpoint.restore(tf.train.latest_checkpoint(saved_model_path)).assert_consumed() 
-  #check point couldn't restore optimezer, loss, etc, so manually set them
-  
-  model.compile(optimizer=optimizer, loss='SparseCategoricalCrossentropy', 
-                    metrics=['SparseCategoricalCrossentropy','SparseCategoricalAccuracy'])
+  model, optimizer = build_model(vocab_inp_size, vocab_tar_size, inp_tokenizer, 
+                                 targ_tokenizer,embedding_dim, hidden_units_num)
 
   dataset_train = Dataset.from_tensor_slices((train_inputs_indexed[:test_limit], 
                                                   train_targets_indexed[:test_limit])).shuffle(BUFFER_SIZE)
   dataset_train = dataset_train.batch(BATCH_SIZE, drop_remainder=True) #((batch_size,Tx),(batch_size,Ty))
-  #dataset_train = dataset_train.batch(BATCH_SIZE)
 
   #model.fit(dataset_train)
   checkpoint_prefix = os.path.join(saved_model_path, "ckpt")
   model.load_weights(checkpoint_prefix)
   #y_preds_oh = model.predict(dataset_train) #y one hot encoded, shape (m,Ty,vacab_targ_size), type is numpy array
-  #y_preds_indexed = tf.math.argmax(y_preds_oh, axis=-1)
 
   #y_preds_indexed = np.argmax(y_preds_oh, axis=-1)
   predict(train_inputs_indexed, train_targets_indexed, params, model)
@@ -98,7 +76,7 @@ def evaluate():
   dataset_test = Dataset.from_tensor_slices((test_inputs_indexed[:test_limit], 
                                                   test_targets_indexed[:test_limit])).shuffle(BUFFER_SIZE)
   dataset_test = dataset_test.batch(BATCH_SIZE, drop_remainder=True)
- 
+  model.evaluate(dataset_test) 
   #y_preds_oh = model.predict(dataset_test)
   #y_preds_indexed = np.argmax(y_preds_oh, axis=-1)
   predict(test_inputs_indexed, test_targets_indexed, params, model)
