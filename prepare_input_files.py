@@ -9,7 +9,7 @@ from numpy.random import rand
 from numpy.random import shuffle
 
 RAW_FILE = 'deu.txt'
-example_limit = 40000
+example_limit = 180000
 FULL_DATA_FILE = 'english-german-{}.csv'.format(example_limit)
 TRAIN_FILE = 'english-german-train-{}.csv'.format(example_limit)
 TEST_FILE = 'english-german-test-{}.csv'.format(example_limit)

@@ -97,7 +97,7 @@ def convert_to_sentence(tokenizer, tensor):
   return sentence
 
 class Encoder(tf.keras.Model):
-  def __init__(self, vocab_size, embedding_dim, enc_units_num, batch_sz):
+  def __init__(self, vocab_size, embedding_dim, enc_units_num, Tx, batch_sz):
     super(Encoder, self).__init__()
     self.batch_sz = batch_sz
     self.enc_units_num = enc_units_num
@@ -108,9 +108,16 @@ class Encoder(tf.keras.Model):
                                    recurrent_initializer='glorot_uniform')
     self.bi_LSTM_last = Bidirectional(LSTM(enc_units_num, return_sequences=True, 
                                       return_state = True))
+    self.bi_LSTM_middle = Bidirectional(LSTM(enc_units_num, return_sequences=True))
+    self.bi_LSTM_fist = Bidirectional(LSTM(enc_units_num, return_sequences=True,
+                                           input_shape = (batch_sz, Tx, embedding_dim)))
   def call(self, x, hidden):
     x = self.embedding(x)
-    #output, state = self.gru(x, initial_state=hidden)
+    #total 4 layers ob bi-lstm
+    x = self.bi_LSTM_fist(x)
+    enc_layers = 2
+    for _ in range(enc_layers):
+        x = self.bi_LSTM_middle(x)
     encoder_output, hidden_fwd, cell_fwd, hidden_bwd, cell_bwd = self.bi_LSTM_last(x)
     hidden = Concatenate(axis=-1)([hidden_fwd, hidden_bwd])
     cell = Concatenate(axis=-1)([cell_fwd, cell_bwd])

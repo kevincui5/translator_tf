@@ -1,11 +1,8 @@
 
 in trainer4 add pretrained embedding weights
 
-in trainer4 add custom metric
 
-use dataset in eval4.py, like trainer3's evaluation function
 
-fix trainer2, prediction doens't work. not sure if issue in training or prediction
 
 the tensorflow demo in the guide doesn't cover everything.  this prgram tries to
 put as much as relevent new features in this project so you can better understand

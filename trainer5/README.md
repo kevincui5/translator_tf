@@ -1,2 +1,0 @@
-copied from trainer4 and override train_step eval cannot restore decoder components
-programming error, delete

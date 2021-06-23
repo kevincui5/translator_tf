@@ -8,10 +8,10 @@ gcloud ai-platform local train \
         --module-name=trainer6.task \
         --package-path="./trainer6" \
         -- \
-        --batch_size=84 \
+        --batch_size=256 \
         --embedding_dim=256 \
         --hidden_units=1024 \
-        --num_epochs=30 \
+        --num_epochs=20 \
         --job-dir="./job" \
         --output_dir="./trained_model6_"$example_limit \
         --full_data_path="./english-german-"$example_limit".csv" \

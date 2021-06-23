@@ -10,8 +10,8 @@ from os import path
 
 def train(args):
     assert not path.exists(args['output_dir']), "Model directory {} exists.".format(args['output_dir'])
-    path.exists(args['full_data_path'])
-    path.exists(args['train_data_path'])
+    #path.exists(args['full_data_path'])
+    #path.exists(args['train_data_path'])
     params = get_dataset_params(args['full_data_path'])
     BATCH_SIZE = args['batch_size']
     embedding_dim = args['embedding_dim']
@@ -20,6 +20,7 @@ def train(args):
     targ_tokenizer = params['targ_tokenizer']
     vocab_inp_size = params['vocab_inp_size']
     vocab_tar_size = params['vocab_tar_size']
+    max_length_inp = params['max_length_inp']
     input_ndarray_train, target_ndarray_train = load_dataset(inp_tokenizer, 
                                                              targ_tokenizer, 
                                                              args['train_data_path'])      
@@ -29,7 +30,8 @@ def train(args):
     
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
-        encoder = Encoder(vocab_inp_size, embedding_dim, hidden_units_num, BATCH_SIZE)
+        encoder = Encoder(vocab_inp_size, embedding_dim, hidden_units_num, 
+                          max_length_inp, BATCH_SIZE)
         #attention_layer = BahdanauAttention(10)
         #attention_result, attention_weights = attention_layer(sample_hidden, sample_output)
         decoder = Decoder(vocab_tar_size, embedding_dim, hidden_units_num, BATCH_SIZE)

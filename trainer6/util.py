@@ -6,7 +6,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import os.path
-from nltk.translate.bleu_score import corpus_bleu
 from trainer6.Translator import Translator
 
 # Converts the unicode file to ascii
@@ -164,22 +163,3 @@ class SaveCheckpoint(tf.keras.callbacks.Callback):
   def on_epoch_end(self, epoch, logs=None):
     if (epoch + 1) % 2 == 0:
       self.checkpoint.save(file_prefix=self.checkpoint_prefix)
-
-# class BleuMetric(tf.keras.metrics.Metric): 
-#   def __init__(self, inp_tokenizer, targ_tokenizer, name=None):
-#     super(BleuMetric, self).__init__(name=name)
-#     self.inp_tokenizer = inp_tokenizer
-#     self.targ_tokenizer = targ_tokenizer
-#     self.targ_sentences = list()
-#     self.predicted_sentences = list()
-       
-#   def update_state(self, y, y_pred,sample_weight=None):
-#     targ_sentence = convert_to_sentence(self.targ_tokenizer, y.eval())
-#     predicted_sentence = convert_to_sentence_tagged(self.targ_tokenizer, y_pred.eval())
-#     self.targ_sentences.append([targ_sentence.split()[1:-1]])
-#     self.predicted_sentences.append(predicted_sentence.split()[1:-1])    
-#     return self.total_cm
-      
-#   def result(self):
-#     blue1 = corpus_bleu(self.targ_sentences, self.predicted_sentences, weights=(1.0, 0, 0, 0))
-#     return blue1

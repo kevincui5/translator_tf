@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import tensorflow as tf
-from trainer6.util import get_dataset_params, load_dataset, build_model, SaveCheckpoint
+from trainer6.util import get_dataset_params, load_dataset, build_model
 from tensorflow.keras.callbacks import EarlyStopping
 import os.path
 
