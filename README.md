@@ -5,27 +5,36 @@
 
 Neural Machine Translation with attention mechanism implemented with some of tensorflow 2's newest feature such as overriding training step and test step function of Keras subclassed model.
 
-Though Keras NMT with attention tutorial already shows how to implement a basic NMT model with attention with tensorflow, it would be interesting to try out some other new functionality comes out since tensorflow 2.2. since these model needs custom training and evaluating loop and it would be a good test case to implement these features.
-By subclassing keras model and overriding train_step and test_step for customized training and inference loop
-but still able to use the many features come with keras model, such as fit, evaluate,
-metric, etc...
+Though Keras NMT with attention tutorial already shows how to implement a basic NMT model with attention with tensorflow, it would be interesting to try out some other new functionality comes out since tensorflow 2.2. with an example since this model needs custom training and evaluating loop and it would be a good test case to implement these features.
+By subclassing keras model and overriding train_step and test_step for customized training and inference loop, we are able to use the many features come with keras model, such as fit, evaluate, metric, etc...
 
+Implementing NMT with attention using functional API is ok but 
+hard to maintain the code.  Using the subclassing (objected oriented) approach produce much better result.
 
-using the best practice suggested by tensorflow guide
-i picked NMT because it is relatively complex that using functional API is ok but 
-hard to maintain the code.  using the subclassing (objected oriented) approach produce much better result
-Note that the __init__() method of the base Layer class takes some keyword arguments, in particular a name and a dtype. It's good practice to pass these arguments to the parent class in __init__() and to include them in the layer config:
 
 Encoder, Decoder, and BahdanauAttention are all layers, and Translator is a model.
+
 `
 class Encoder(Layer):
 `
+
 `
 class Decoder(Layer):
 `
+
 `
 class BahdanauAttention(Layer):
 `
+
+The __init__() method of the base Layer class takes some keyword arguments, in particular a name and a dtype. It's good practice to pass these arguments to the parent class in __init__() and to include them in the layer config:
+
+```
+class Translator(tf.keras.Model):
+    def __init__(self, vocab_inp_size, vocab_tar_size, embedding_dim, 
+                 hidden_units_num, name="Translator", 
+                 **kwargs):
+      super(Translator, self).__init__(name=name, **kwargs)
+```      
 
 By assigning Keras Layers' instance as attributes of other Layers, the weights of inner layer become trackable:
 ```
@@ -84,7 +93,7 @@ By subclassing Keras Model class and overriding train_step(), we can use model.f
 
 `model.fit(dataset_train, epochs=EPOCHS, steps_per_epoch=steps_per_epoch, verbose=2, callbacks=[early_stopping], validation_data=dataset_valid)`
 
-We are also able to provide different logic in back prop, which is in train_step() from in forward pass, which is inside model's call() function.
+We are also able to provide different logic in back prop, which is in train_step(), from that in forward pass, which is inside model's call() function.
 ```
 def train_step(self, data):
       inp, targ = data
@@ -112,7 +121,7 @@ def train_step(self, data):
       # Return a dict mapping metric names to current value
       return {**{'loss': loss}, **{m.name: m.result() for m in self.metrics}}
 ```
-Here, teacher's force is used, just like the original Keras tutorial, where ground truth at time step t is extracted and feed in as decoder's input.
+Here, teacher's forcing is used, just like in the original Keras tutorial, where ground truth at time step t is extracted and feed in as decoder's input.
 ```
 def forward_pass(self, inp, targ):   
       enc_output, enc_hidden, enc_cell = self.encoder(inp) #inp shape (batch_size, Tx)
@@ -221,17 +230,50 @@ Note: you can change how many examples you'd like to have and the ratio between 
  ./train-local6.sh
  ``
     Note: change parameters in train-local6.sh such as example_limit, batch size, epoch, etc.  example_limit is the total example size in the full dataset file, which is the sum of size of training, testing and validation set.
+    
  2) Train on Google Cloud Platform:
  
  ``
  ./train-gcp.sh
  ``
 
+```
+{
+  "insertId": "1mu16xvg3neh4fz",
+  "jsonPayload": {
+    "message": "632/632 - 2111s - loss: 0.0352 - sparse_categorical_crossentropy: 4.0840 - sparse_categorical_accuracy: 0.9916 - val_loss: 9.6631 - val_sparse_categorical_crossentropy: 6.7951 - val_sparse_categorical_accuracy: 0.5026",
+    "created": 1624466846.0364513,
+    "lineno": 328,
+    "levelname": "INFO",
+    "pathname": "/runcloudml.py"
+  },
+  "resource": {
+    "type": "ml_job",
+    "labels": {
+      "task_name": "master-replica-0",
+      "job_id": "test2",
+      "project_id": "translator-tf"
+    }
+  },
+  "timestamp": "2021-06-23T16:47:26.036451338Z",
+  "severity": "INFO",
+  "labels": {
+    "compute.googleapis.com/resource_name": "cmle-training-9317302373347310056",
+    "compute.googleapis.com/zone": "us-central1-a",
+    "compute.googleapis.com/resource_id": "3765747248663563168",
+    "ml.googleapis.com/trial_id": "",
+    "ml.googleapis.com/job_id/log_area": "root"
+  },
+  "logName": "projects/translator-tf/logs/master-replica-0",
+  "receiveTimestamp": "2021-06-23T16:47:28.546650117Z"
+}
+```
 ### Evaluating
 
  ``
 python3 eval6.py
   ``
+ 
  example_limit needs to match the size of full dataset file.
  
 ### Translating
