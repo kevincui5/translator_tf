@@ -3,14 +3,13 @@
 
 ![Compatibility](img/Python-3.7-blue.svg)![Compatibility](img/Tensorflow-2.4-blue.svg)
 
-Neural Machine Translation with attention mechanism implemented with some of tensorflow 2's newest feature such as overriding training step and test step function of Keras subclassed model.
+In this tutorial we will implement Neural Machine Translation with attention mechanism with some of tensorflow 2's newest feature such as overriding training step and test step function of Keras subclassed model.
 
-Though Keras NMT with attention tutorial already shows how to implement a basic NMT model with attention with tensorflow, it would be interesting to try out some other new functionality comes out since tensorflow 2.2. with an example since this model needs custom training and evaluating loop and it would be a good test case to implement these features.
-By subclassing keras model and overriding train_step and test_step for customized training and inference loop, we are able to use the many features come with keras model, such as fit, evaluate, metric, etc...
+Though Keras NMT with attention tutorial already shows how to implement a basic NMT model with attention with tensorflow, it would be interesting to try out some other new functionality comes out since tensorflow 2.2.  Since in this model the logic in training and evaluating loop is different (in training, teacher's forcing is used) and it would be a good test case to implement these features.
+Also by subclassing keras model and overriding train_step and test_step for customized training and inference loop, we are able to use the many features come with keras model, such as fit, evaluate, metric, etc...
 
 Implementing NMT with attention using functional API is ok but 
-hard to maintain the code.  Using the subclassing (objected oriented) approach produce much better result.
-
+hard to maintain the code.  Using the subclassing (objected oriented) approach produce much clearner code.
 
 Encoder, Decoder, and BahdanauAttention are all layers, and Translator is a model.
 
@@ -26,7 +25,7 @@ class Decoder(Layer):
 class BahdanauAttention(Layer):
 `
 
-The __init__() method of the base Layer class takes some keyword arguments, in particular a name and a dtype. It's good practice to pass these arguments to the parent class in __init__() and to include them in the layer config:
+The __init__() function of the base Layer class takes some keyword arguments, in particular a name and a dtype. It's good practice to pass these arguments to the parent class in __init__() and to include them in the layer config:
 
 ```
 class Translator(tf.keras.Model):
@@ -159,6 +158,15 @@ def test_step(self, data):
 ```
 Inside the function it simply calls model's call() function which just invokes forward pass logic that records loss and metrics.
 
+Tensorflow makes transfer learning such as use pre-trained embedding layer very easy to implement:
+```
+embedding_matrix = get_embedding_matrix("glove.twitter.27B.100d.txt", 
+                                            eng_vocab_size, eng_tokenizer)
+    decoder_embedding = Embedding(vocab_tar_size, embedding_dim, 
+                                  weights=[embedding_matrix], input_length=1,
+```
+For detail on how to get GloVe file and convert it to embedding matrix, you can check [here](https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/)
+
 
 ## What each file does: 
  * trainer6/BahdanauAttention.py: Define attention layer.  Uses "add" attention mechanism. 
@@ -268,19 +276,59 @@ Note: you can change how many examples you'd like to have and the ratio between 
   "receiveTimestamp": "2021-06-23T16:47:28.546650117Z"
 }
 ```
+  3) The model is saved in trained_model6_x directory where x is the size of full dataset.  If the training is very long and you want the training to be continued after an interruption, you can define an callback that save the model and optimizer at some interval of epochs.
+  
+  
 ### Evaluating
+example_limit needs to match the size of full dataset file.
 
  ``
 python3 eval6.py
   ``
  
- example_limit needs to match the size of full dataset file.
+```
+...
+src=[<start> ich spiele gern poker . <end> ], target=[<start> i like to play poker . <end> ], predicted=[<start> i like playing golf . <end> ]
+...
+BLEU-1: 0.961240
+BLEU-2: 0.942952
+BLEU-3: 0.936637
+BLEU-4: 0.917990
+...
+```
+These scores are calculated on a single batch of training set.  It calls model.translate() function that I implemented on each example to get the translated sentence and with the original sentence and target sentence to get the bleu score on the whole set.
+
+```
+BLEU-1: 0.950670
+BLEU-2: 0.928722
+BLEU-3: 0.921977
+BLEU-4: 0.900512
+```
+These scores are calculated on test set. We can see the numbers are little lower than that of training set.  The model is trained on 90% of 180000 examples.  If it is trained on much smaller set, say 40000, see the difference between the bleu scores on test set are quite big:
+```
+BLEU-1: 0.973352
+BLEU-2: 0.958513
+BLEU-3: 0.952494
+BLEU-4: 0.935998
+```
+(training set)
+```
+BLEU-1: 0.791289
+BLEU-2: 0.688844
+BLEU-3: 0.651557
+BLEU-4: 0.572273
+```
+(test set)
+We can see larger training set overcomes overfitting issue.
+
+Finally, we can call evaluation to check on this model's loss and accuracy on test set:
+
+`model.evaluate(dataset_test)`
  
-### Translating
- 
- Just use model.translate() to implement translating.
- 
- 
+```
+1/1 [==============================] - ETA: 0s - loss: 10.8105 - sparse_categori1/1 [==============================] - 18s 18s/step - loss: 10.8105 - sparse_categorical_crossentropy: 6.4926 - sparse_categorical_accuracy: 0.4898
+```
+To see bleu score in the metrics we would have to implement a user-defined metrics class and pass it in model.compile() function, but I am not sure how to do that in graph mode since that seems to require processing each example in a batch in the test_step().
 
 <!--<div align="left">-->
   <!--<br><br><img  width="100%" "height:100%" "object-fit: cover" "overflow: hidden" src=""><br><br>-->

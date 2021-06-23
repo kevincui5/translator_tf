@@ -8,7 +8,7 @@ hidden_units_num = 1024
 BATCH_SIZE = 256
 embedding_dim = 256
 
-example_limit = 40000
+example_limit = 180000
 full_data_path = 'english-german-{}.csv'.format(example_limit)
 train_data_path = 'english-german-train-{}.csv'.format(example_limit)
 test_data_path = 'english-german-test-{}.csv'.format(example_limit)
@@ -32,9 +32,6 @@ def predict(inputs_indexed, targets_indexed, params, model):
       continue
     print('src=[%s], target=[%s], predicted=[%s]' % (inp_sentence, 
           targ_sentence, predicted_sentence))
-    attention_plot = attention_plot[:len(predicted_sentence.split(' ')),
-                                  :len(targ_sentence.split(' '))]
-    #plot_attention(attention_plot, targ_sentence.split(' '), predicted_sentence.split(' ')) 
 
   print('BLEU-1: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(1.0, 0, 0, 0)))
   print('BLEU-2: %f' % corpus_bleu(targ_sentences, predicted_sentences, weights=(0.5, 0.5, 0, 0)))
@@ -60,14 +57,10 @@ def evaluate():
                                                   train_targets_indexed[:test_limit])).shuffle(BUFFER_SIZE)
   dataset_train = dataset_train.batch(BATCH_SIZE, drop_remainder=True) #((batch_size,Tx),(batch_size,Ty))
 
-  #model.fit(dataset_train)
   checkpoint_prefix = os.path.join(saved_model_path, "ckpt")
   model.load_weights(checkpoint_prefix)
-  #y_preds_oh = model.predict(dataset_train) #y one hot encoded, shape (m,Ty,vacab_targ_size), type is numpy array
 
-  #y_preds_indexed = np.argmax(y_preds_oh, axis=-1)
   predict(train_inputs_indexed, train_targets_indexed, params, model)
-  #bleu_score(train_inputs_indexed[:test_limit], train_targets_indexed[:test_limit], y_preds_indexed, params)
   
   
   
@@ -76,10 +69,9 @@ def evaluate():
   dataset_test = Dataset.from_tensor_slices((test_inputs_indexed[:test_limit], 
                                                   test_targets_indexed[:test_limit])).shuffle(BUFFER_SIZE)
   dataset_test = dataset_test.batch(BATCH_SIZE, drop_remainder=True)
-  model.evaluate(dataset_test) 
-  #y_preds_oh = model.predict(dataset_test)
-  #y_preds_indexed = np.argmax(y_preds_oh, axis=-1)
   predict(test_inputs_indexed, test_targets_indexed, params, model)
-  #bleu_score(test_inputs_indexed[:test_limit], test_targets_indexed[:test_limit], y_preds_indexed, params)
+
+  model.evaluate(dataset_test) 
+
 evaluate()
  
