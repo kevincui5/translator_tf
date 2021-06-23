@@ -134,7 +134,7 @@ def forward_pass(self, inp, targ):
         predictions, dec_hidden, dec_cell, _ = self.decoder(dec_input, dec_hidden, 
                                                        dec_cell, enc_output) #throws away attension weights
         predicted_id = tf.math.argmax(predictions, axis=-1) #predicted_id shape == (batch_size,)
-        #y_pred.append(predictions) #(Ty, batch_size)
+        #(Ty, batch_size)
         y_pred = y_pred.write(t, predictions)
         dec_input = tf.expand_dims(predicted_id, 1)
         self.compiled_loss(targ[:, t], predictions, regularization_losses=self.losses)
