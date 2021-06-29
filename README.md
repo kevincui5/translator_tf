@@ -11,6 +11,7 @@ Also by subclassing keras model and overriding train_step and test_step for cust
 Implementing NMT with attention using functional API is ok but 
 hard to maintain the code.  Using the subclassing (objected oriented) approach produce much clearner code.
 
+## Define Keras Layers and Model
 Encoder, Decoder, and BahdanauAttention are all layers, and Translator is a model.
 
 `
@@ -67,6 +68,7 @@ class Encoder(Layer):
 ```
 Other things you can do with an individual Keras Layer are customizing loss and metric, making it trainable or not etc.
 
+## Loss Function
 For the loss function, you can either implement one like that in the original tutorial, or use the Keras' build-in loss functions passed in through model.compile():
 
 `
@@ -88,6 +90,7 @@ self.optimizer.apply_gradients(zip(gradients, trainable_vars))
 ```
 Notice we pass from_logits=True to the loss function object for numerical stability.  We have to use linear activation function in the Dense layer in Decoder then.  The loss function object will take care of softmax function part.  See [this](https://stackoverflow.com/questions/52125924/why-does-sigmoid-crossentropy-of-keras-tensorflow-have-low-precision/52126567#52126567) for detail.
 
+## Override train_step()
 By subclassing Keras Model class and overriding train_step(), we can use model.fit() to train our model.  We can now take advantage of all the functionality that come with fit(), such as callbacks, batch and epoch handling, validation set metrics monitoring, and custom training loop logic etc.
 
 `model.fit(dataset_train, epochs=EPOCHS, steps_per_epoch=steps_per_epoch, verbose=2, callbacks=[early_stopping], validation_data=dataset_valid)`
@@ -121,6 +124,8 @@ def train_step(self, data):
       return {**{'loss': loss}, **{m.name: m.result() for m in self.metrics}}
 ```
 Here, teacher's forcing is used, just like in the original Keras tutorial, where ground truth at time step t is extracted and feed in as decoder's input.
+
+## Override test_step()
 ```
 def forward_pass(self, inp, targ):   
       enc_output, enc_hidden, enc_cell = self.encoder(inp) #inp shape (batch_size, Tx)
@@ -158,6 +163,8 @@ def test_step(self, data):
 ```
 Inside the function it simply calls model's call() function which just invokes forward pass logic that records loss and metrics.
 
+## Use Pre-trained Embedding Weights
+
 Tensorflow makes transfer learning such as use pre-trained embedding layer very easy to implement:
 ```
 embedding_matrix = get_embedding_matrix("glove.twitter.27B.100d.txt", 
@@ -165,10 +172,16 @@ embedding_matrix = get_embedding_matrix("glove.twitter.27B.100d.txt",
     decoder_embedding = Embedding(vocab_tar_size, embedding_dim, 
                                   weights=[embedding_matrix], input_length=1,
 ```
-For detail on how to get GloVe file and convert it to embedding matrix, you can check [here](https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/)
+You can freeze the layer by setting trainable_weights to false:
 
+`decoder_embedding.trainable = False`
 
-## What each file does: 
+By freezing embedding layer, you stop training from destroy the embedding vectors information stored in the layer.  For detail on how to get GloVe file and convert it to embedding matrix, you can check [here](https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/)
+
+## Requirements:
+ * Python 3, Tensorflow 2.4, and Google Cloud SDK, though samll changes can be make so it doesn't require Google Cloud SDK.
+
+## What Each File Does: 
  * trainer6/BahdanauAttention.py: Define attention layer.  Uses "add" attention mechanism. 
  * trainer6/Decoder.py: Define decoder layer, which contains a single LSTM layer.
  * trainer6/Encoder.py: Define encoder layer, which contains a single Bi-LSTM layer.
@@ -206,7 +219,7 @@ Stand aside.	Gehen Sie zur Seite!
 ...
 ```
 
- 2) Put deu.txt in the same directory as  prepare_input_files.py and execute it.  It produces 4 files, a full, a training , a test and a validation dataset file:
+ 2) Put deu.txt in the same directory as  prepare_input_files.py, configure and execute it.  It produces 4 files, a full, a training , a test and a validation dataset file:
  
    ``
  python prepare_input_files.py
@@ -280,13 +293,36 @@ Note: you can change how many examples you'd like to have and the ratio between 
   
   
 ### Evaluating
-example_limit needs to match the size of full dataset file.
+Make sure eval6.py is in same directory as trained_model6_x.  Evaluation is first done by calculating bleu scores on a single batch of training set.  It then calls model.translate() function on each example to get the translated sentence, and with the original sentence and target sentence the bleu scores on the whole set are calculated.
+
+example_limit needs to match the size of full dataset file.  Set the value in eval6.py.  Let's use a smaller example set first, say 40,000.  So configure prepare_input_files.py and execute it to generate the input files.  Then execute eval6.py:
+
+```
+Score on training set:
+...
+BLEU-1: 0.973352
+BLEU-2: 0.958513
+BLEU-3: 0.952494
+BLEU-4: 0.935998
+```
+
+```
+Score on validation set:
+...
+BLEU-1: 0.791289
+BLEU-2: 0.688844
+BLEU-3: 0.651557
+BLEU-4: 0.572273
+```
+see the difference between the bleu scores on validation set are quite big because of overfitting on small dataset.
+Now let's prepare 180000 input files by configure and executing prepare_input_files.py, then execute eval6.py:
 
  ``
 python3 eval6.py
   ``
  
 ```
+Score on training set:
 ...
 src=[<start> ich spiele gern poker . <end> ], target=[<start> i like to play poker . <end> ], predicted=[<start> i like playing golf . <end> ]
 ...
@@ -296,30 +332,17 @@ BLEU-3: 0.936637
 BLEU-4: 0.917990
 ...
 ```
-These scores are calculated on a single batch of training set.  It calls model.translate() function that I implemented on each example to get the translated sentence and with the original sentence and target sentence to get the bleu score on the whole set.
+
 
 ```
+Score on validation set:
+...
 BLEU-1: 0.950670
 BLEU-2: 0.928722
 BLEU-3: 0.921977
 BLEU-4: 0.900512
 ```
-These scores are calculated on test set. We can see the numbers are little lower than that of training set.  The model is trained on 90% of 180000 examples.  If it is trained on much smaller set, say 40000, see the difference between the bleu scores on test set are quite big:
-```
-BLEU-1: 0.973352
-BLEU-2: 0.958513
-BLEU-3: 0.952494
-BLEU-4: 0.935998
-```
-(training set)
-```
-BLEU-1: 0.791289
-BLEU-2: 0.688844
-BLEU-3: 0.651557
-BLEU-4: 0.572273
-```
-(test set)
-We can see larger training set overcomes overfitting issue.
+Now there is little difference between scores on training set and validation set, we can see larger training set overcomes overfitting issue.
 
 Finally, we can call evaluation to check on this model's loss and accuracy on test set:
 
