@@ -314,7 +314,7 @@ BLEU-2: 0.688844
 BLEU-3: 0.651557
 BLEU-4: 0.572273
 ```
-see the difference between the bleu scores on validation set are quite big because of overfitting on small dataset.
+You can see the difference between the bleu scores on validation set are quite big because of overfitting on small dataset.
 Now let's prepare 180000 input files by configure and executing prepare_input_files.py, then execute eval6.py:
 
  ``
