@@ -53,7 +53,7 @@ gradients = tape.gradient(loss, trainable_vars)
 ``` 
 In the original tutorial, the Encoder is a Keras Model instead of Layer, so Enocder's trainable_variables have to be manually included. 
 
-Note: we lazily create layers' weights during layers' instantiation like Kera's best practice guide suggests.  Notice there is no input_shape specified in lstm __init__() or input_length in embedding init():
+Note: we lazily create layers' weights during layers' instantiation as Kera's best practice guide suggests.  Notice there is no input_shape specified in lstm __init__() or input_length in embedding init():
 
 ```
 class Encoder(Layer):
