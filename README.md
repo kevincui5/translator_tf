@@ -179,7 +179,7 @@ You can freeze the layer by setting trainable_weights to false:
 By freezing embedding layer, you stop training from destroy the embedding vectors information stored in the layer.  For detail on how to get GloVe file and convert it to embedding matrix, you can check [here](https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/)
 
 ## Requirements:
- * Python 3, Tensorflow 2.4, and Google Cloud SDK, though samll changes can be make so it doesn't require Google Cloud SDK.
+ * Python 3, Tensorflow 2.4, and Google Cloud SDK, though samll changes can be made so it doesn't require Google Cloud SDK.
 
 ## What Each File Does: 
  * trainer6/BahdanauAttention.py: Define attention layer.  Uses "add" attention mechanism. 
